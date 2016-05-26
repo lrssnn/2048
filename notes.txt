@@ -1,0 +1,8 @@
+Port Minimax, Expectimax to C#, maybe C++ and Java
+Maybe rust also???
+
+Direct port of game.py, test that out,
+
+then move on to porting the minimax and expectimax algorithms
+
+but don't port directly, use raw recursion
