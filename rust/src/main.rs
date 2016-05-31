@@ -10,12 +10,12 @@ use std::collections::HashMap;
 
 type Trans_Table = HashMap<u64, trans_table_entry_t>;
 
-static row_left_table:   [u16; 65536] = [0; 65536];
-static row_right_table:  [u16; 65536] = [0; 65536];
-static col_up_table:     [u64; 65536] = [0; 65536];
-static col_down_table:   [u64; 65536] = [0; 65536];
-static heur_score_table: [f32; 65536] = [0.0; 65536];
-static score_table:      [f32; 65536] = [0.0; 65536];
+static mut row_left_table:   [u16; 65536] = [0; 65536];
+static mut row_right_table:  [u16; 65536] = [0; 65536];
+static mut col_up_table:     [u64; 65536] = [0; 65536];
+static mut col_down_table:   [u64; 65536] = [0; 65536];
+static mut heur_score_table: [f32; 65536] = [0.0; 65536];
+static mut score_table:      [f32; 65536] = [0.0; 65536];
 
 const SCORE_LOST_PENALTY:       f32 = 200000.0;
 const SCORE_MONOTONICITY_POWER: f32 = 4.0;
@@ -74,9 +74,10 @@ fn count_empty(board: &mut u64) -> u64 {
     *board & 0xF as u64
 }
 
-fn init_tables() {
+unsafe fn init_tables() {
+
     for row in 0..65536 {
-        let line: [u16; 4] = [
+        let mut line: [u16; 4] = [
             (row >> 0) & 0xF,
             (row >> 4) & 0xF,
             (row >> 8) & 0xF,
@@ -170,7 +171,7 @@ fn init_tables() {
     }            
 }
 
-fn execute_move_0(board: u64) -> u64 {
+unsafe fn execute_move_0(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
     ret ^= col_up_table[((t >>  0) & ROW_MASK) as usize] << 0;
@@ -180,7 +181,7 @@ fn execute_move_0(board: u64) -> u64 {
     ret
 }
 
-fn execute_move_1(board: u64) -> u64 {
+unsafe fn execute_move_1(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
     ret ^= col_down_table[((t >>  0) & ROW_MASK) as usize] << 0;
@@ -190,31 +191,33 @@ fn execute_move_1(board: u64) -> u64 {
     ret
 }
 
-fn execute_move_2(board: u64) -> u64 {
+unsafe fn execute_move_2(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_left_table[((board >>  0) & ROW_MASK) as usize] << 0) as u64;
-    ret ^= (row_left_table[((board >> 16) & ROW_MASK) as usize] << 16) as u64;
-    ret ^= (row_left_table[((board >> 32) & ROW_MASK) as usize] << 32) as u64;
-    ret ^= (row_left_table[((board >> 48) & ROW_MASK) as usize] << 48) as u64;
+    ret ^= (row_left_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (row_left_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (row_left_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (row_left_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
-fn execute_move_3(board: u64) -> u64 {
+unsafe fn execute_move_3(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_right_table[((board >>  0) & ROW_MASK) as usize] << 0) as u64;
-    ret ^= (row_right_table[((board >> 16) & ROW_MASK) as usize] << 16) as u64;
-    ret ^= (row_right_table[((board >> 32) & ROW_MASK) as usize] << 32) as u64;
-    ret ^= (row_right_table[((board >> 48) & ROW_MASK) as usize] << 48) as u64;
+    ret ^= (row_right_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (row_right_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (row_right_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (row_right_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
 fn execute_move(mv: u8, board: u64) -> u64 {
-    match mv {
-        0 => execute_move_0(board),
-        1 => execute_move_1(board),
-        2 => execute_move_2(board),
-        3 => execute_move_3(board),
-        _ => {println!("INVALID_MOVE"); 0}
+    unsafe{
+        match mv {
+            0 => execute_move_0(board),
+            1 => execute_move_1(board),
+            2 => execute_move_2(board),
+            3 => execute_move_3(board),
+            _ => {println!("INVALID_MOVE"); 0}
+        }
     }
 }
 
@@ -254,12 +257,16 @@ struct eval_state {
 }
 
 fn score_heur_board(board: u64) -> f32 {
-    score_helper(          board , &heur_score_table) +
-    score_helper(transpose(board), &heur_score_table)
+    unsafe{
+        score_helper(          board , &heur_score_table) +
+        score_helper(transpose(board), &heur_score_table)
+    }
 }
 
 fn score_board(board: u64)  -> f32 {
-    score_helper(board, &score_table)
+    unsafe{
+        score_helper(board, &score_table)
+    }
 }
 
 const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
@@ -396,7 +403,7 @@ fn draw_tile() -> u64 {
 }
 
 fn insert_tile_rand(mut board: u64, tile: &mut u64) -> u64 {
-    let index: u32 = rand::thread_rng().gen_range(0, count_empty(&mut board) as u32);
+    let mut index: u32 = rand::thread_rng().gen_range(0, count_empty(&mut board) as u32);
     let mut tmp: u64 = board;
     loop {
         while (tmp & 0xF) != 0 {
@@ -404,7 +411,7 @@ fn insert_tile_rand(mut board: u64, tile: &mut u64) -> u64 {
             *tile <<= 4;
         }
         if index == 0 { break; }
-        --index;
+        index -= 1;
         tmp >>= 4;
         *tile <<= 4;
     }
@@ -456,7 +463,9 @@ fn play_game(get_move: fn(u64) -> u8) {
 }
 
 fn main() {
-    init_tables();
+    unsafe{
+        init_tables();
+    }
     play_game(find_best_move);
 }
 
