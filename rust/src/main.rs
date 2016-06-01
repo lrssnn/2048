@@ -29,16 +29,18 @@ const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 const ROW_MASK: u64 = 0xFFFF; 
 const COL_MASK: u64 = 0x000F000F000F000F;
 
-fn print_board(board: &mut u64) {
+fn print_board(mut board: u64) {
+    //let mut copy = board;
     for i in 0..4 {
         for j in 0..4 {
-            let power = *board & 0xf; //Take the last byte in the number
-            print!("{}", if power == 0 {0} else {2 << power}); //2<<power = 2^power
-            *board >>= 4; //Next byte
+            let power = board & 0xf; //Take the last byte in the number
+            print!("{:5},", if power == 0 {0} else {2 << power-1}); //2<<power = 2^power
+            board >>= 4; //Next byte
         }
         print!("\n");
     }
     print!("\n");
+    board = 0;
 }
 
 fn unpack_col(row: u16) -> u64 {
@@ -61,23 +63,22 @@ fn transpose(board: u64) -> u64 {
     b1 | (b2 >> 24) | (b3 << 24)
 }
 
-fn count_empty(board: &mut u64) -> u64 {
-    *board |= (*board >> 2) & 0x3333333333333333;
-    *board |=  *board >> 1;
-    *board  = !*board & 0x1111111111111111;
+fn count_empty(mut board: u64) -> u64 {
+    board |= (board >> 2) & 0x3333333333333333;
+    board |=  board >> 1;
+    board  = !board & 0x1111111111111111;
 
-    *board += *board >> 32;
-    *board += *board >> 16;
-    *board += *board >>  8;
-    *board += *board >>  4;
+    board += board >> 32;
+    board += board >> 16;
+    board += board >>  8;
+    board += board >>  4;
     
-    *board & 0xF as u64
+    board & 0xF as u64
 }
 
 unsafe fn init_tables() {
-
-    for row in 0..65536 {
-        let mut line: [u16; 4] = [
+    for row in 0..65536usize {
+        let mut line = [
             (row >> 0) & 0xF,
             (row >> 4) & 0xF,
             (row >> 8) & 0xF,
@@ -147,7 +148,9 @@ unsafe fn init_tables() {
             if line[i] == 0 {
                 line[i] = line[j];
                 line[j] = 0;
-                i -= 1;
+                if i > 0{
+                    i -= 1;
+                }
             } else if line[i] == line[j] {
                 if line[i] != 0xF {
                     line[i] += 1;
@@ -157,23 +160,24 @@ unsafe fn init_tables() {
             i+= 1;
         }
 
-        let result: u16 = (line[0] << 0) |
-                          (line[1] << 4) |
-                          (line[2] << 8) |
-                          (line[3] << 12);
+        let result: u16 = ((line[0] as u16) << 0) |
+                          ((line[1] as u16)<< 4) |
+                          ((line[2] as u16) << 8) |
+                          ((line[3] as u16) << 12);
         let rev_result: u16 = reverse_row(result);
-        let rev_row = reverse_row(row);
+        let rev_row   : u16 = reverse_row(row as u16);
 
-        row_left_table  [    row as usize] =                row  ^                result;
-        row_right_table [rev_row as usize] =            rev_row  ^            rev_result;
-        col_up_table  [    row as usize]   = unpack_col(    row) ^ unpack_col(    result);
-        col_down_table [rev_row as usize]  = unpack_col(rev_row) ^ unpack_col(rev_result);
+        row_left_table  [    row] =                row as u16  ^                result;
+        row_right_table [rev_row as usize] =            rev_row         ^            rev_result;
+        col_up_table    [    row] = unpack_col(    row as u16) ^ unpack_col(    result);
+        col_down_table  [rev_row as usize] = unpack_col(rev_row)        ^ unpack_col(rev_result);
     }            
 }
 
 unsafe fn execute_move_0(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
+    println!("This: {}", col_up_table[((t >>  0) & ROW_MASK) as usize]);
     ret ^= col_up_table[((t >>  0) & ROW_MASK) as usize] << 0;
     ret ^= col_up_table[((t >> 16) & ROW_MASK) as usize] << 4;
     ret ^= col_up_table[((t >> 32) & ROW_MASK) as usize] << 8;
@@ -310,7 +314,7 @@ fn score_tilechoose_node(mut state: &mut eval_state,mut board:u64,mut cprob:f32)
         }
     }
 
-    let num_open = count_empty(&mut board);
+    let num_open = count_empty(board);
     cprob /= num_open as f32;
 
     let mut res: f32 = 0.0;
@@ -380,7 +384,7 @@ fn find_best_move(mut board: u64) -> u8 {
     let mut best: f32 = 0.0;
     let mut bestmove: u8 = 0;
 
-    print_board(&mut board);
+    print_board(board);
     println!("Current scores: heur {}, actual {}", score_heur_board(board), score_board(board));
 
     for mv in 0..4 {
@@ -402,25 +406,25 @@ fn draw_tile() -> u64 {
     }
 }
 
-fn insert_tile_rand(mut board: u64, tile: &mut u64) -> u64 {
-    let mut index: u32 = rand::thread_rng().gen_range(0, count_empty(&mut board) as u32);
+fn insert_tile_rand(mut board: u64, mut tile: u64) -> u64 {
+    let mut index: u32 = rand::thread_rng().gen_range(0, count_empty(board) as u32);
     let mut tmp: u64 = board;
     loop {
         while (tmp & 0xF) != 0 {
             tmp >>= 4;
-            *tile <<= 4;
+            tile <<= 4;
         }
         if index == 0 { break; }
         index -= 1;
         tmp >>= 4;
-        *tile <<= 4;
+        tile <<= 4;
     }
-    return board | *tile;
+    return board | tile;
 }
 
 fn initial_board() -> u64 {
     let board: u64 = draw_tile() << (4 * rand::thread_rng().gen_range(0, 16));
-    insert_tile_rand(board, &mut draw_tile())
+    insert_tile_rand(board, draw_tile())
 }
 
 fn play_game(get_move: fn(u64) -> u8) {
@@ -455,18 +459,43 @@ fn play_game(get_move: fn(u64) -> u8) {
 
         let mut tile: u64 = draw_tile();
         if tile == 2 {scorepenalty += 4};
-        board = insert_tile_rand(newboard, &mut tile);
+        board = insert_tile_rand(newboard, tile);
     }
 
-    print_board(&mut board);
+    print_board(board);
     println!("Game Over. Score: {}. Highest Tile: {}.", score_board(board) -(scorepenalty as f32), get_max_rank(board));
 }
 
 fn main() {
+    
     unsafe{
         init_tables();
     }
-    play_game(find_best_move);
+   // play_game(find_best_move);
+    
+    let mut board: u64 = 0x1111000000000004;
+    println!("Board:");
+    print_board(board);
+    println!("Transpose:");
+    print_board(transpose(board));
+ 
+    unsafe{
+        println!("Move 0:");
+        print_board(execute_move_0(board));
+        println!("Move 1:");
+        print_board(execute_move_1(board));
+        println!("Move 2:");
+        print_board(execute_move_2(board));
+        println!("Move 3:");
+        print_board(execute_move_3(board));
+    }
+    print_board(board);
+
+    let col = 0x2223;
+    print_board(unpack_col(col));
+    print_board(unpack_col(col) << 4);
+    print_board(unpack_col(col) << 8);
+    print_board(unpack_col(col) << 12);
 }
 
 struct trans_table_entry_t {
