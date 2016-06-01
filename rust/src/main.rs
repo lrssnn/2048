@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
@@ -5,10 +6,9 @@ extern crate rand;
 use rand::Rng;
 use std::time::SystemTime;
 use std::cmp::max;
-use std::cmp::min;
 use std::collections::HashMap;
 
-type Trans_Table = HashMap<u64, trans_table_entry_t>;
+type TransTable = HashMap<u64, TransTableEntry>;
 
 static mut row_left_table:   [u16; 65536] = [0; 65536];
 static mut row_right_table:  [u16; 65536] = [0; 65536];
@@ -31,8 +31,8 @@ const COL_MASK: u64 = 0x000F000F000F000F;
 
 fn print_board(mut board: u64) {
     //let mut copy = board;
-    for i in 0..4 {
-        for j in 0..4 {
+    for _i in 0..4 {
+        for _j in 0..4 {
             let power = board & 0xf; //Take the last byte in the number
             print!("{:5},", if power == 0 {0} else {2 << power-1}); //2<<power = 2^power
             board >>= 4; //Next byte
@@ -40,7 +40,6 @@ fn print_board(mut board: u64) {
         print!("\n");
     }
     print!("\n");
-    board = 0;
 }
 
 fn unpack_col(row: u16) -> u64 {
@@ -251,8 +250,8 @@ fn count_distinct_tiles(mut board: u64) -> u32 {
     max(2, count)
 }
 
-struct eval_state {
-    trans_table: Trans_Table,
+struct EvalState {
+    trans_table: TransTable,
     maxdepth: u32,
     curdepth: u32,
     cachehits: u32,
@@ -276,7 +275,7 @@ fn score_board(board: u64)  -> f32 {
 const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;
 
-fn score_move_node(mut state: &mut eval_state, board: u64, cprob: f32) -> f32 {
+fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
     let mut best: f32 = 0.0;
     state.curdepth+= 1;
     for mv in 0..4 {
@@ -292,7 +291,7 @@ fn score_move_node(mut state: &mut eval_state, board: u64, cprob: f32) -> f32 {
     best
 }
 
-fn score_tilechoose_node(mut state: &mut eval_state,mut board:u64,mut cprob:f32) -> f32 {
+fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
     if cprob < CPROB_THRESH_BASE || state.curdepth >= state.depth_limit {
         state.maxdepth = max(state.curdepth, state.maxdepth);
         return score_heur_board(board);
@@ -332,7 +331,7 @@ fn score_tilechoose_node(mut state: &mut eval_state,mut board:u64,mut cprob:f32)
     res = res / num_open as f32;
 
     if state.curdepth < CACHE_DEPTH_LIMIT {
-        let entry = trans_table_entry_t {depth: state.curdepth as u8, heuristic: res};
+        let entry = TransTableEntry {depth: state.curdepth as u8, heuristic: res};
         state.trans_table.insert(board, entry);
     }
 
@@ -347,7 +346,7 @@ fn score_helper(board: u64, table: &[f32]) -> f32{
     table[((board >> 48) & ROW_MASK) as usize] 
 }
 
-fn _score_toplevel_move(mut state: &mut eval_state, board: u64, mv: u8) -> f32 {
+fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
     let newboard = execute_move(mv, board);
 
     if board == newboard {
@@ -358,7 +357,7 @@ fn _score_toplevel_move(mut state: &mut eval_state, board: u64, mv: u8) -> f32 {
 }
 
 fn score_toplevel_move(board: u64, mv: u8) -> f32 {
-    let mut state = eval_state{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: Trans_Table::new()};
+    let mut state = EvalState{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: TransTable::new()};
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
     let start = SystemTime::now();
@@ -380,7 +379,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     res
 }
 
-fn find_best_move(mut board: u64) -> u8 {
+fn find_best_move(board: u64) -> u8 {
     let mut best: f32 = 0.0;
     let mut bestmove: u8 = 0;
 
@@ -406,7 +405,7 @@ fn draw_tile() -> u64 {
     }
 }
 
-fn insert_tile_rand(mut board: u64, mut tile: u64) -> u64 {
+fn insert_tile_rand(board: u64, mut tile: u64) -> u64 {
     let mut index: u32 = rand::thread_rng().gen_range(0, count_empty(board) as u32);
     let mut tmp: u64 = board;
     loop {
@@ -446,7 +445,7 @@ fn play_game(get_move: fn(u64) -> u8) {
         moveno += 1;
 
         mv = get_move(board);
-        if mv < 0 {
+        if mv > 3 {
             break;
         }
 
@@ -457,7 +456,7 @@ fn play_game(get_move: fn(u64) -> u8) {
             continue;
         }
 
-        let mut tile: u64 = draw_tile();
+        let tile: u64 = draw_tile();
         if tile == 2 {scorepenalty += 4};
         board = insert_tile_rand(newboard, tile);
     }
@@ -473,7 +472,7 @@ fn main() {
     }
    // play_game(find_best_move);
     
-    let mut board: u64 = 0x1111000000000004;
+    let board: u64 = 0x1111000000000004;
     println!("Board:");
     print_board(board);
     println!("Transpose:");
@@ -498,7 +497,7 @@ fn main() {
     print_board(unpack_col(col) << 12);
 }
 
-struct trans_table_entry_t {
+struct TransTableEntry {
     depth: u8,
     heuristic: f32
 }
