@@ -230,7 +230,7 @@ fn get_max_rank(mut board: u64) -> u16 {
     maxrank
 }
 
-fn count_distinct_tiles(mut board: u64) -> u16 {
+fn count_distinct_tiles(mut board: u64) -> u32 {
     let mut bitset: u16 = 0;
     while board != 0 {
         bitset |= 1 << (board & 0xF);
@@ -244,7 +244,7 @@ fn count_distinct_tiles(mut board: u64) -> u16 {
         bitset &= bitset - 1;
         count+= 1;
     }
-    count
+    max(2, count)
 }
 
 struct eval_state {
@@ -355,7 +355,7 @@ fn _score_toplevel_move(mut state: &mut eval_state, board: u64, mv: u8) -> f32 {
 
 fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     let mut state = eval_state{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: Trans_Table::new()};
-    state.depth_limit = max(3, (count_distinct_tiles(board) - 2) as u32);
+    state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
     let start = SystemTime::now();
     let res = _score_toplevel_move(&mut state, board, mv);
