@@ -474,36 +474,36 @@ fn main() {
     
     unsafe{
         init_tables();
-    
-    play_game(find_best_move);
-    //for i in col_up_table.iter(){
-    //    println!("{:x}", i);
-    //    print_board(*i);
-   // }
     }
-    
-    let board: u64 = 0x1111000000000004;
-    println!("Board:");
-    print_board(board);
-    println!("Transpose:");
-    print_board(transpose(board));
- 
-    unsafe{
-        println!("Move 0:");
-        print_board(execute_move_0(board));
-        println!("Move 1:");
-        print_board(execute_move_1(board));
-        println!("Move 2:");
-        print_board(execute_move_2(board));
-        println!("Move 3:");
-        print_board(execute_move_3(board));
-    }
-    print_board(board);
 
-    println!("{}", count_empty(board));
+    test();
+    //play_game(find_best_move);
+   
+}
+
+fn test() {
+    let mut board: u64;
+    board = 0x4000000000010001;
+    print_board(board);
+    print_board(reverse_board(board));
+    print_board(transpose(board));
+    board = 0x0000000000000002;
+    print_board(board);
+    print_board(transpose(board));
+    board = 0x0000000000000022;
+    print_board(board);
+    println!("{:x}", transpose(board));
+    print_board(transpose(board));
 }
 
 struct TransTableEntry {
     depth: u8,
     heuristic: f32
+}
+
+fn reverse_board(mut board: u64) -> u64{
+    (reverse_row((board >>  0) as u16) as u64) <<  0 |
+    (reverse_row((board >> 16) as u16) as u64) << 16 |
+    (reverse_row((board >> 32) as u16) as u64) << 32 |
+    (reverse_row((board >> 48) as u16) as u64) << 48
 }
