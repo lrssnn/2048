@@ -483,17 +483,11 @@ fn main() {
 
 fn test() {
     let mut board: u64;
-    board = 0x4000000000010001;
+    board = 0x0221344356657887;
     print_board(board);
-    print_board(reverse_board(board));
-    print_board(transpose(board));
-    board = 0x0000000000000002;
-    print_board(board);
-    print_board(transpose(board));
-    board = 0x0000000000000022;
-    print_board(board);
-    println!("{:x}", transpose(board));
-    print_board(transpose(board));
+    //board = 0x1310353057507970;
+    //print_board(board);
+    print_board(move_right(board));
 }
 
 struct TransTableEntry {
@@ -506,4 +500,31 @@ fn reverse_board(mut board: u64) -> u64{
     (reverse_row((board >> 16) as u16) as u64) << 16 |
     (reverse_row((board >> 32) as u16) as u64) << 32 |
     (reverse_row((board >> 48) as u16) as u64) << 48
+}
+
+fn move_right(mut board: u64) -> u64 {
+    let mut last: u8 = 0x0;
+    let mut cur : u8 = 0x0;
+    let mut result: u64 = 0;
+    for row in 0..4 {
+        for cell in 0..4 {
+            cur = (board & 0xF) as u8; // Take the 'rightmost' nibble (leftmost on board)
+            print!("{},{}: {},{} | Shift:{}\t", row, cell, cur, last, ((3-row) *16) + ((3 - cell) * 4));
+            if last == cur && cur != 0 {
+                result |= ((cur + 1) as u64) << (((row) *16) + ((cell) * 4));
+            } else if cur == 0 && last != 0 {
+                result |= (last as u64) <<(((row) *16) + ((cell) * 4));
+            } else if last == 0 {
+                result |= (last as u64) << ((row * 16) + (cell *4));
+            } else {
+                result |= (cur as u64) <<(((row) *16) + ((cell) * 4));
+            }
+            last = cur;
+            board  >>= 4;
+            //result >>= 4;
+        }
+        last = 0x0;
+        print!("\n");
+    }
+    return result;
 }
