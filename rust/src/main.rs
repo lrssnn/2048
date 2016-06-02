@@ -176,7 +176,7 @@ unsafe fn init_tables() {
 unsafe fn execute_move_0(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
-    println!("This: {}", col_up_table[((t >>  0) & ROW_MASK) as usize]);
+    //println!("This: {}", col_up_table[((t >>  0) & ROW_MASK) as usize]);
     ret ^= col_up_table[((t >>  0) & ROW_MASK) as usize] << 0;
     ret ^= col_up_table[((t >> 16) & ROW_MASK) as usize] << 4;
     ret ^= col_up_table[((t >> 32) & ROW_MASK) as usize] << 8;
@@ -249,7 +249,7 @@ fn count_distinct_tiles(mut board: u64) -> u32 {
     }
     max(2, count)
 }
-
+#[derive(Copy, Clone)]
 struct EvalState {
     trans_table: TransTable,
     maxdepth: u32,
@@ -346,7 +346,8 @@ fn score_helper(board: u64, table: &[f32]) -> f32{
     table[((board >> 48) & ROW_MASK) as usize] 
 }
 
-fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
+fn _score_toplevel_move(mut state: &EvalState, board: u64, mv: u8) -> f32 {
+    let mut state = state;
     let newboard = execute_move(mv, board);
 
     if board == newboard {
@@ -361,7 +362,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
     let start = SystemTime::now();
-    let res = _score_toplevel_move(&mut state, board, mv);
+    let res = _score_toplevel_move(&state, board, mv);
     let diff = match SystemTime::now().duration_since(start) {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
@@ -406,7 +407,9 @@ fn draw_tile() -> u64 {
 }
 
 fn insert_tile_rand(board: u64, mut tile: u64) -> u64 {
-    let mut index: u32 = rand::thread_rng().gen_range(0, count_empty(board) as u32);
+    let empty = count_empty(board) as u32;
+    if empty == 0 {return board;}
+    let mut index: u32 = rand::thread_rng().gen_range(0, empty);
     let mut tmp: u64 = board;
     loop {
         while (tmp & 0xF) != 0 {
@@ -431,14 +434,18 @@ fn play_game(get_move: fn(u64) -> u8) {
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
 
-'out: loop {
+    loop {
         let mv: u8;
         let newboard: u64;
-
-        for i in 0..4 {
+        let mut i = 0;
+        while i < 4 {
             if execute_move(i, board) != board {
-                break 'out;
+                break;
             }
+            i+=1;
+        }
+        if i >= 4 {
+            break;
         }
 
         println!("Mov #{}, current score={}", moveno, score_board(board) - scorepenalty as f32);
@@ -469,8 +476,13 @@ fn main() {
     
     unsafe{
         init_tables();
+    
+    play_game(find_best_move);
+    //for i in col_up_table.iter(){
+    //    println!("{:x}", i);
+    //    print_board(*i);
+   // }
     }
-   // play_game(find_best_move);
     
     let board: u64 = 0x1111000000000004;
     println!("Board:");
@@ -490,13 +502,10 @@ fn main() {
     }
     print_board(board);
 
-    let col = 0x2223;
-    print_board(unpack_col(col));
-    print_board(unpack_col(col) << 4);
-    print_board(unpack_col(col) << 8);
-    print_board(unpack_col(col) << 12);
+    println!("{}", count_empty(board));
 }
 
+#[derive(Copy, Clone)]
 struct TransTableEntry {
     depth: u8,
     heuristic: f32
