@@ -249,7 +249,6 @@ fn count_distinct_tiles(mut board: u64) -> u32 {
     }
     max(2, count)
 }
-#[derive(Copy, Clone)]
 struct EvalState {
     trans_table: TransTable,
     maxdepth: u32,
@@ -272,7 +271,7 @@ fn score_board(board: u64)  -> f32 {
     }
 }
 
-const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.00001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;
 
 fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
@@ -346,8 +345,7 @@ fn score_helper(board: u64, table: &[f32]) -> f32{
     table[((board >> 48) & ROW_MASK) as usize] 
 }
 
-fn _score_toplevel_move(mut state: &EvalState, board: u64, mv: u8) -> f32 {
-    let mut state = state;
+fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
     let newboard = execute_move(mv, board);
 
     if board == newboard {
@@ -362,7 +360,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
     let start = SystemTime::now();
-    let res = _score_toplevel_move(&state, board, mv);
+    let res = _score_toplevel_move(&mut state, board, mv);
     let diff = match SystemTime::now().duration_since(start) {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
@@ -505,7 +503,6 @@ fn main() {
     println!("{}", count_empty(board));
 }
 
-#[derive(Copy, Clone)]
 struct TransTableEntry {
     depth: u8,
     heuristic: f32
