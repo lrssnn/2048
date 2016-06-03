@@ -482,12 +482,12 @@ fn main() {
 }
 
 fn test() {
-    let mut board: u64;
-    board = 0x0221344356657887;
-    print_board(board);
-    //board = 0x1310353057507970;
-    //print_board(board);
-    print_board(move_right(board));
+    unsafe{
+    let mut row: u16 = 0x2222;
+    print_board(row as u64);
+    print_board(swipe_row_left(row) as u64);
+    print_board(row_left_table[row as usize] as u64);
+    }
 }
 
 struct TransTableEntry {
@@ -503,28 +503,68 @@ fn reverse_board(mut board: u64) -> u64{
 }
 
 fn move_right(mut board: u64) -> u64 {
-    let mut last: u8 = 0x0;
-    let mut cur : u8 = 0x0;
+    let mut last  : u8  = 0;
+    let mut cur   : u8  = 0;
     let mut result: u64 = 0;
+    let mut resRow: u16 = 0;
     for row in 0..4 {
         for cell in 0..4 {
             cur = (board & 0xF) as u8; // Take the 'rightmost' nibble (leftmost on board)
             print!("{},{}: {},{} | Shift:{}\t", row, cell, cur, last, ((3-row) *16) + ((3 - cell) * 4));
             if last == cur && cur != 0 {
-                result |= ((cur + 1) as u64) << (((row) *16) + ((cell) * 4));
+                resRow |= ((cur + 1) as u16); 
             } else if cur == 0 && last != 0 {
-                result |= (last as u64) <<(((row) *16) + ((cell) * 4));
+                resRow  |= (last as u16); 
             } else if last == 0 {
-                result |= (last as u64) << ((row * 16) + (cell *4));
+                resRow |= (last as u16);
             } else {
-                result |= (cur as u64) <<(((row) *16) + ((cell) * 4));
+                resRow |= (cur as u16);
             }
             last = cur;
             board  >>= 4;
-            //result >>= 4;
+            resRow <<= 4;
         }
+        println!("\n{:x}", (resRow as u64) << (row *16));
+        result |= (resRow as u64) << (row * 16);
         last = 0x0;
         print!("\n");
     }
     return result;
+}
+
+fn swipe_row_left(mut row: u16) -> u16 {
+    let mut last: u16 = row & 0xF;
+    let mut cur : u16 = 0;
+    let mut res : u16 = 0;
+    let mut justMerged = false;
+
+    row >>= 4;
+
+    for cell in 0..4 {
+        cur = row & 0xF;
+        println!("Cell {}. Looking at {:x} and {:x}.\n res: {:X}", cell, last, cur, res);
+
+        //if justMerged {
+            justMerged = false;
+        if last == 0 {
+            println!("Moving {:x} into a zero ({:x})", cur, last);
+            res |= cur << cell * 4;
+            last = 0;
+            justMerged = false;
+        } else if cur == last {
+            println!("Merging {:x} into a {:x}", cur, last);
+            res |= cur + 1 << cell * 4;
+            justMerged = true;
+            last = 0;
+        } else {
+            println!("Keeping {} where it was", last);
+            res |= last << cell * 4;
+            last = cur;
+            justMerged = false;
+        }
+
+        row >>= 4;
+        //res <<= 4;
+    }
+        return res;
 }
