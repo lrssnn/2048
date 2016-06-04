@@ -137,7 +137,7 @@ unsafe fn init_tables() {
         //Exectute a move to the left
         let mut i = 0;
         while i < 3 {
-            let mut j = 0;
+            let mut j = i + 1;
             while j < 4 {
                 if line[j] != 0 {break};
                 j += 1;
@@ -149,6 +149,8 @@ unsafe fn init_tables() {
                 line[j] = 0;
                 if i > 0{
                     i -= 1;
+                } else {
+                    continue;
                 }
             } else if line[i] == line[j] {
                 if line[i] != 0xF {
