@@ -7,6 +7,7 @@ use rand::Rng;
 use std::time::SystemTime;
 use std::cmp::max;
 use std::collections::HashMap;
+use std::io;
 
 type TransTable = HashMap<u64, TransTableEntry>;
 
@@ -478,6 +479,7 @@ fn main() {
         init_tables();
     }
 
+    //play_game(get_move_from_human);
     test();
     //play_game(find_best_move);
    
@@ -485,10 +487,16 @@ fn main() {
 
 fn test() {
     unsafe{
-    let mut row: u16 = 0x2222;
-    print_board(row as u64);
-    print_board(swipe_row_left(row) as u64);
-    print_board(row_left_table[row as usize] as u64);
+    let mut board: u64 = 0x4400;
+    print_board(board);
+    board = execute_move(2, board);
+    print_board(board);
+    board = execute_move(1, board);
+    print_board(board);
+    board = execute_move(3, board);
+    print_board(board);
+    board = execute_move(0, board);
+    print_board(board);
     }
 }
 
@@ -569,4 +577,16 @@ fn swipe_row_left(mut row: u16) -> u16 {
         //res <<= 4;
     }
         return res;
+}
+
+fn get_move_from_human(board: u64) -> u8 {
+    print_board(board);
+    println!("Make your move: ");
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input);
+    let input: u8 = input.trim().parse()
+        .expect("Please enter a number");
+
+    input
 }
