@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
@@ -274,7 +273,7 @@ fn score_board(board: u64)  -> f32 {
     }
 }
 
-const CPROB_THRESH_BASE: f32 = 0.00001; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;
 
 fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
@@ -311,7 +310,7 @@ fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) ->
                     return entry.heuristic;
                 }
             }
-            None => {println!("Cache error");}
+            None => {}
         }
     }
 
@@ -368,7 +367,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
     };
-    
+    /*
     println!("Move {}: result {}: eval'd {} moves ({} cache hits, {} cache size) in {} seconds (maxdepth={}",
         mv,
         res,
@@ -377,7 +376,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         state.trans_table.len(),
         diff.as_secs(),
         state.maxdepth);
-
+    */
     res
 }
 
@@ -435,6 +434,8 @@ fn play_game(get_move: fn(u64) -> u8) {
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
 
+    let start = SystemTime::now();
+    
     loop {
         let mv: u8;
         let newboard: u64;
@@ -469,8 +470,15 @@ fn play_game(get_move: fn(u64) -> u8) {
         board = insert_tile_rand(newboard, tile);
     }
 
+    let diff = match SystemTime::now().duration_since(start) {
+        Ok(duration) => duration,
+        Err(duration) => {println!("Time error"); duration.duration()}
+    };
+
     print_board(board);
     println!("Game Over. Score: {}. Highest Tile: {}.", score_board(board) -(scorepenalty as f32), get_max_rank(board));
+
+    println!("Game ran for {} seconds. {} Mv/s. {} Pt/s.", diff, moveNo/diff, (score_board(board) - (scorepenalty as f32))/diff);
 }
 
 fn main() {
@@ -480,8 +488,8 @@ fn main() {
     }
 
     //play_game(get_move_from_human);
-    test();
-    //play_game(find_best_move);
+    //test();
+    play_game(find_best_move);
    
 }
 
