@@ -535,6 +535,9 @@ fn play_game(get_move: fn(u64) -> u8) {
             println!("Illegal Move");
             moveno -= 1;
             continue;
+        } else if score_board(newboard) < score_board(board) {
+            println!("Merged two 32k tiles, losing score in the process");
+            break;
         }
 
         let tile: u64 = draw_tile();
