@@ -6,6 +6,7 @@ use rand::Rng;
 use std::time::SystemTime;
 use std::cmp::max;
 use std::collections::HashMap;
+use std::thread;
 
 type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics from the main code
 
@@ -450,8 +451,19 @@ fn find_best_move(board: u64) -> u8 {
     println!("Current scores: heur {}, actual {}", score_heur_board(board), score_board(board));
 
     // For each possible move, evaluate the move with expectimax search and track the best result.
+    // Concurrent
+    let mut threads = vec!();
     for mv in 0..4 {
-        let res = score_toplevel_move(board, mv);
+        let handle = thread::spawn(move || {
+            (score_toplevel_move(board, mv), mv)
+        });
+        
+        threads.push(handle);
+    }
+
+    for thread in threads {
+
+        let (res, mv) = thread.join().unwrap();
 
         if res > best {
             best = res;
