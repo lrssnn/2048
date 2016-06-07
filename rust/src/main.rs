@@ -513,7 +513,7 @@ fn initial_board() -> u64 {
 }
 
 // Uses expectimax search to play one game of 2048 to completion
-fn play_game(get_move: fn(u64) -> u8) {
+fn play_game(get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16) {
     let mut board: u64 = initial_board();
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
@@ -561,11 +561,15 @@ fn play_game(get_move: fn(u64) -> u8) {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
     };
+    
+    let finalScore = score_board(board) - scorepenalty as f32;
+    let time = diff.as_secs();
 
     print_board(board);
-    println!("Game Over. Score: {}. Highest Tile: {}.", score_board(board) -(scorepenalty as f32), get_max_rank(board));
+    println!("Game Over. Score: {}. Highest Tile: {}.", finalScore, get_max_rank(board));
 
-    println!("Game ran for {} seconds. {} Mv/s. {} Pt/s.", diff.as_secs(), moveno/diff.as_secs(), (score_board(board) - (scorepenalty as f32)).floor() as u64/diff.as_secs());
+    // Return Time, Score, Moves/s, Pts/s, Highest Tile
+    (time, finalScore, moveno as f32/time as f32, finalScore/time as f32, get_max_rank(board)) 
 }
 
 // Bootstrap: initialise tables and play a game
@@ -574,8 +578,20 @@ fn main() {
     unsafe{
         init_tables();
     }
-
-    play_game(find_best_move);
+    
+    let mut results = String::new(); 
+    for run  in 0..10 {
+        let (time, score, mvsec, ptsec, maxtile) = play_game(find_best_move);    
+        results.push_str(format!("Run {:2} | Time: {:6} | Score: {:8} | Mv/s: {:3.2} | Pt/s: {:3.2} | Max Tile: {:5}\n",
+            run,
+            time,
+            score,
+            mvsec,
+            ptsec,
+            2<<maxtile).as_str());
+        println!("{}", results);
+        
+    }
 }
 
 
