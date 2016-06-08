@@ -588,7 +588,7 @@ fn main() {
             score,
             mvsec,
             ptsec,
-            2<<maxtile).as_str());
+            2<<(maxtile-1)).as_str());
         println!("{}", results);
         
     }
