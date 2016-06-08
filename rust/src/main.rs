@@ -29,7 +29,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.0002; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -513,7 +513,7 @@ fn initial_board() -> u64 {
 }
 
 // Uses expectimax search to play one game of 2048 to completion
-fn play_game(get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16) {
+fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16) {
     let mut board: u64 = initial_board();
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
@@ -534,7 +534,7 @@ fn play_game(get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16) {
             break;
         }
 
-        println!("Mov #{}, current score={}", moveno, score_board(board) - scorepenalty as f32);
+        println!("Run {}, Mov #{}, current score={}",run_num, moveno, score_board(board) - scorepenalty as f32);
         moveno += 1;
 
         mv = get_move(board);
@@ -581,7 +581,7 @@ fn main() {
     
     let mut results = String::new(); 
     for run  in 0..10 {
-        let (time, score, mvsec, ptsec, maxtile) = play_game(find_best_move);    
+        let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
         results.push_str(format!("Run {:2} | Time: {:6} | Score: {:8} | Mv/s: {:3.2} | Pt/s: {:3.2} | Max Tile: {:5}\n",
             run,
             time,
