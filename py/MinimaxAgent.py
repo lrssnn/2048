@@ -25,13 +25,13 @@ class MinimaxAgent:
             blanks = len(self.game.get_available_cells())
             # print blanks
             if blanks > (self.gameSize * 0.7):
-                print "shallow"
+                # print "shallow"
                 depth = self.maxDepth - 1
             elif blanks > (self.gameSize * 0.3):
-                print "norm"
+                # print "norm"
                 depth = self.maxDepth
             else:
-                print "deep"
+                # print "deep"
                 depth = self.maxDepth + 1
         else: depth = self.maxDepth
 
