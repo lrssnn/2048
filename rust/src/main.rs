@@ -517,6 +517,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     let mut board: u64 = initial_board();
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
+    let mut gotMaxTile = false;
 
     let start = SystemTime::now();
     
@@ -549,6 +550,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             continue;
         } else if score_board(newboard) < score_board(board) {
             println!("Merged two 32k tiles, losing score in the process");
+            gotMaxTile = true;
             break;
         }
 
@@ -569,7 +571,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     println!("Game Over. Score: {}. Highest Tile: {}.", finalScore, get_max_rank(board));
 
     // Return Time, Score, Moves/s, Pts/s, Highest Tile
-    (time, finalScore, moveno as f32/time as f32, finalScore/time as f32, get_max_rank(board)) 
+    (time, finalScore, moveno as f32/time as f32, finalScore/time as f32, if !gotMaxTile { get_max_rank(board) } else { 16 }) 
 }
 
 // Bootstrap: initialise tables and play a game
@@ -580,7 +582,9 @@ fn main() {
     }
     
     let mut results = String::new(); 
-    for run  in 0..10 {
+    let mut run = 0;
+    loop {
+        run += 1;
         let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
         results.push_str(format!("Run {:2} | Time: {:6} | Score: {:8} | Mv/s: {:3.2} | Pt/s: {:3.2} | Max Tile: {:5}\n",
             run,
@@ -590,7 +594,9 @@ fn main() {
             ptsec,
             2<<(maxtile-1)).as_str());
         println!("{}", results);
-        
+        if maxtile == 16 {
+            break;
+        }        
     }
 }
 
