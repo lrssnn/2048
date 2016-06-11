@@ -7,6 +7,7 @@ use std::time::SystemTime;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::thread;
+use std::io::prelude::*;
 
 type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics from the main code
 
@@ -447,8 +448,8 @@ fn find_best_move(board: u64) -> u8 {
     let mut best: f32 = 0.0;
     let mut bestmove: u8 = 0;
 
-    print_board(board);
-    println!("Current scores: heur {}, actual {}", score_heur_board(board), score_board(board));
+    //print_board(board);
+    //println!("Current scores: heur {}, actual {}", score_heur_board(board), score_board(board));
 
     // For each possible move, evaluate the move with expectimax search and track the best result.
     // Concurrent
@@ -535,7 +536,8 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             break;
         }
 
-        println!("Run {}, Mov #{}, current score={}",run_num, moveno, score_board(board) - scorepenalty as f32);
+        print!("\rRun {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
+        std::io::stdout().flush();
         moveno += 1;
 
         mv = get_move(board);
@@ -567,8 +569,9 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     let finalScore = score_board(board) - scorepenalty as f32;
     let time = diff.as_secs();
 
+    println!("");
     print_board(board);
-    println!("Game Over. Score: {}. Highest Tile: {}.", finalScore, get_max_rank(board));
+    //println!("Game Over. Score: {}. Highest Tile: {}.", finalScore, get_max_rank(board));
 
     // Return Time, Score, Moves/s, Pts/s, Highest Tile
     (time, finalScore, moveno as f32/time as f32, finalScore/time as f32, if !gotMaxTile { get_max_rank(board) } else { 16 }) 
@@ -583,21 +586,69 @@ fn main() {
     
     let mut results = String::new(); 
     let mut run = 0;
+
+    let mut times = vec!();
+    let mut scores = vec!();
+    let mut move_rates = vec!();
+    let mut score_rates = vec!();
+    let mut max_tiles = vec!();
+
     loop {
         run += 1;
         let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
-        results.push_str(format!("Run {:2} | Time: {:6} | Score: {:8} | Mv/s: {:3.2} | Pt/s: {:3.2} | Max Tile: {:5}\n",
+
+        times.push(time);
+        scores.push(score);
+        move_rates.push(mvsec);
+        score_rates.push(ptsec);
+        max_tiles.push(maxtile);
+
+        println!("Run {:2} | Time: {:5} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
-            time,
-            score,
-            mvsec,
-            ptsec,
-            2<<(maxtile-1)).as_str());
-        println!("{}", results);
+            avg2(&times),
+            avg(&move_rates),
+            avg(&score_rates),
+            percentAbove(&max_tiles, 11),
+            percentAbove(&max_tiles, 12),
+            percentAbove(&max_tiles, 13),
+            percentAbove(&max_tiles, 14),
+            percentAbove(&max_tiles, 15),
+            percentAbove(&max_tiles, 16));
+            
         if maxtile == 16 {
             break;
         }        
     }
 }
 
+fn avg(vec: &Vec<f32>) -> f32 {
+    let mut res: f32 = 0.0;
+    
+    for num in vec {
+        res += *num;
+    }
+    
+    res/vec.len() as f32
+}
 
+fn avg2(vec: &Vec<u64>) -> f32 {
+    let mut res: f32 = 0.0;
+    
+    for num in vec {
+        res += *num as f32;
+    }
+    
+    res/vec.len() as f32
+}
+
+fn percentAbove(vec: &Vec<u16>, thresh: u16) -> f32 {
+    let mut amnt = 0;
+
+    for num in vec {
+        if *num >= thresh {
+            amnt += 1;
+        }
+    }
+
+    (amnt as f32 / vec.len() as f32) * 100.0
+}
