@@ -30,7 +30,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.00001; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.000001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -430,7 +430,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
     };
-    
+   /* 
     println!("Move {}: result {}: eval'd {} moves ({} cache hits, {} cache size) in {} seconds (maxdepth={}",
         mv,
         res,
@@ -439,7 +439,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         state.trans_table.len(),
         diff.as_secs(),
         state.maxdepth);
-    
+    */
     res
 }
 
