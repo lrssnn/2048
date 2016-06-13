@@ -14,7 +14,7 @@ result = ""
 
 # Params
 depth = 3
-dynamic = False
+dynamic = True
 
 # Arrays for result taking
 times      = []
@@ -32,7 +32,7 @@ thirtytwoK = []
 sixtyfourK = []
 
 for _ in range(100):
-    game = Game(size=5)
+    game = Game(size=4)
     agent = MinimaxAgent(game, depth, dynamicDepth=dynamic)
 
     moves = 0

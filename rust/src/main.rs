@@ -30,7 +30,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.0002; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.00001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -523,6 +523,9 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     let start = SystemTime::now();
     
     loop {
+
+    	print_board(board);
+
         let mv: u8;
         let newboard: u64;
         let mut i = 0;
@@ -536,8 +539,8 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             break;
         }
 
-        print!("\rRun {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
-        std::io::stdout().flush();
+        println!("Run {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
+        //std::io::stdout().flush();
         moveno += 1;
 
         mv = get_move(board);
@@ -602,7 +605,8 @@ fn main() {
         move_rates.push(mvsec);
         score_rates.push(ptsec);
         max_tiles.push(maxtile);
-
+	
+	println!("CPROB THRESHOLD: {}", CPROB_THRESH_BASE);
         println!("Run {:2} | Time: {:5} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
             avg2(&times),
@@ -615,6 +619,8 @@ fn main() {
             percentAbove(&max_tiles, 15),
             percentAbove(&max_tiles, 16));
             
+	break;
+	
         if maxtile == 16 {
             break;
         }        
