@@ -430,7 +430,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         Ok(duration) => duration,
         Err(duration) => {println!("Time error"); duration.duration()}
     };
-    /*
+    
     println!("Move {}: result {}: eval'd {} moves ({} cache hits, {} cache size) in {} seconds (maxdepth={}",
         mv,
         res,
@@ -439,7 +439,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
         state.trans_table.len(),
         diff.as_secs(),
         state.maxdepth);
-    */
+    
     res
 }
 
@@ -518,7 +518,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     let mut board: u64 = initial_board();
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
-    let mut gotMaxTile = false;
+    let mut got_max_tile = false;
 
     let start = SystemTime::now();
     
@@ -536,8 +536,8 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             break;
         }
 
-        print!("\rRun {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
-        std::io::stdout().flush();
+        //print!("\rRun {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
+        //std::io::stdout().flush();
         moveno += 1;
 
         mv = get_move(board);
@@ -552,7 +552,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             continue;
         } else if score_board(newboard) < score_board(board) {
             println!("Merged two 32k tiles, losing score in the process");
-            gotMaxTile = true;
+            got_max_tile = true;
             break;
         }
 
@@ -566,15 +566,15 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
         Err(duration) => {println!("Time error"); duration.duration()}
     };
     
-    let finalScore = score_board(board) - scorepenalty as f32;
+    let final_score = score_board(board) - scorepenalty as f32;
     let time = diff.as_secs();
 
     println!("");
     print_board(board);
-    //println!("Game Over. Score: {}. Highest Tile: {}.", finalScore, get_max_rank(board));
+    //println!("Game Over. Score: {}. Highest Tile: {}.", final_score, get_max_rank(board));
 
     // Return Time, Score, Moves/s, Pts/s, Highest Tile
-    (time, finalScore, moveno as f32/time as f32, finalScore/time as f32, if !gotMaxTile { get_max_rank(board) } else { 16 }) 
+    (time, final_score, moveno as f32/time as f32, final_score/time as f32, if !got_max_tile { get_max_rank(board) } else { 16 }) 
 }
 
 // Bootstrap: initialise tables and play a game
@@ -584,7 +584,7 @@ fn main() {
         init_tables();
     }
     
-    let mut results = String::new(); 
+    //let mut results = String::new(); 
     let mut run = 0;
 
     let mut times = vec!();
@@ -608,12 +608,12 @@ fn main() {
             avg2(&times),
             avg(&move_rates),
             avg(&score_rates),
-            percentAbove(&max_tiles, 11),
-            percentAbove(&max_tiles, 12),
-            percentAbove(&max_tiles, 13),
-            percentAbove(&max_tiles, 14),
-            percentAbove(&max_tiles, 15),
-            percentAbove(&max_tiles, 16));
+            percent_above(&max_tiles, 11),
+            percent_above(&max_tiles, 12),
+            percent_above(&max_tiles, 13),
+            percent_above(&max_tiles, 14),
+            percent_above(&max_tiles, 15),
+            percent_above(&max_tiles, 16));
             
         if maxtile == 16 {
             break;
@@ -641,7 +641,7 @@ fn avg2(vec: &Vec<u64>) -> f32 {
     res/vec.len() as f32
 }
 
-fn percentAbove(vec: &Vec<u16>, thresh: u16) -> f32 {
+fn percent_above(vec: &Vec<u16>, thresh: u16) -> f32 {
     let mut amnt = 0;
 
     for num in vec {
