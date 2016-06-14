@@ -1,6 +1,7 @@
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
+extern crate term;
 
 use rand::Rng;
 use std::time::SystemTime;
@@ -522,8 +523,10 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 
     let start = SystemTime::now();
     
+    println!("\n\n\n\n\n"); // This is gross
     loop {
 
+        cursorUp(6);
     	print_board(board);
 
         let mv: u8;
@@ -572,8 +575,8 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     let final_score = score_board(board) - scorepenalty as f32;
     let time = diff.as_secs();
 
-    println!("");
-    print_board(board);
+    //println!("");
+    //print_board(board);
     //println!("Game Over. Score: {}. Highest Tile: {}.", final_score, get_max_rank(board));
 
     // Return Time, Score, Moves/s, Pts/s, Highest Tile
@@ -606,7 +609,7 @@ fn main() {
         score_rates.push(ptsec);
         max_tiles.push(maxtile);
 	
-	println!("CPROB THRESHOLD: {}", CPROB_THRESH_BASE);
+	print!("PROB THRESH: {} ", CPROB_THRESH_BASE);
         println!("Run {:2} | Time: {:5} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
             avg2(&times),
@@ -619,10 +622,10 @@ fn main() {
             percent_above(&max_tiles, 15),
             percent_above(&max_tiles, 16));
             
-	break;
-	
+        cursorUp(7);
+
         if maxtile == 16 {
-            break;
+           // break;
         }        
     }
 }
@@ -657,4 +660,12 @@ fn percent_above(vec: &Vec<u16>, thresh: u16) -> f32 {
     }
 
     (amnt as f32 / vec.len() as f32) * 100.0
+}
+
+fn cursorUp(num: u16) {
+    let mut term = term::stdout().unwrap();
+    
+    for i in 0..num {
+        term.cursor_up();   
+    }
 }
