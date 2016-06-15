@@ -31,7 +31,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.0005; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.005; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -609,7 +609,7 @@ fn main() {
         score_rates.push(ptsec);
         max_tiles.push(maxtile);
 	
-	print!("PROB THRESH: {} ", CPROB_THRESH_BASE);
+	print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
         println!("Run {:2} | Time: {:5} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
             avg2(&times),
@@ -622,7 +622,7 @@ fn main() {
             percent_above(&max_tiles, 15),
             percent_above(&max_tiles, 16));
             
-        cursorUp(6);
+        cursorUp(7);
 
         if maxtile == 16 {
            // break;
