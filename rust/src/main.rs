@@ -8,6 +8,7 @@ use std::time::SystemTime;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::thread;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 
 type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics from the main code
@@ -610,7 +611,7 @@ fn main() {
         max_tiles.push(maxtile);
 	
 	print!("PROB THRESH: {} ", CPROB_THRESH_BASE);
-        println!("Run {:2} | Time: {:5} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
+        println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
             avg2(&times),
             avg(&move_rates),
@@ -624,6 +625,21 @@ fn main() {
             
         cursorUp(7);
 
+        // Log results to file.
+        // We open and close each run so that information is not lost in the event of interruption
+        {
+            let mut file = OpenOptions::new()
+                        .append(true)
+                        .open("results.txt").unwrap();
+
+            write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
+                CPROB_THRESH_BASE,
+                time,
+                score,
+                mvsec,
+                ptsec,
+                maxtile);
+        }
         if maxtile == 16 {
            // break;
         }        
