@@ -1,0 +1,3 @@
+Prob Thresh: 0.005 | Time:  1298 | Score: 383308.0 | Mv/Sec: 11.30 | Pt/Sec: 295.31 | Max Tile: 14
+Prob Thresh: 0.005 | Time:  1369 | Score: 387200.0 | Mv/Sec: 10.87 | Pt/Sec: 282.83 | Max Tile: 14
+Prob Thresh: 0.01 | Time:  1215 | Score: 627012.0 | Mv/Sec: 18.29 | Pt/Sec: 516.06 | Max Tile: 15
