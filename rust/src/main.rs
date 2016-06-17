@@ -32,7 +32,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.005; // Will not evaluate nodes less likely than this
+static mut CPROB_THRESH_BASE: f32 = 0.05; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -337,7 +337,9 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
         state.moves_evaled+= 1;
 
         if board != newboard {
-            best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
+            unsafe {
+                best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
+            }
         }
     }
     state.curdepth -= 1;
@@ -347,7 +349,7 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
 
 // Returns the value of a computer node in the game tree.
 // Plays the part of the Expected Value node in the Expectimax search.
-fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
+unsafe fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
     // Base case: simply return the heuristic if the current state is less likely than the threshold
     // or deeper than the depth limit
     if cprob < CPROB_THRESH_BASE || state.curdepth >= state.depth_limit {
@@ -418,7 +420,9 @@ fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
         return 0.0;
     }
 
-    score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
+    unsafe {
+        score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
+    }
 }
 
 // Takes a board and a move and sets up the infrastructure to perform the expectimax search on it.
@@ -587,62 +591,68 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 // Bootstrap: initialise tables and play a game
 fn main() {
     
+    const RUNS: u16 = 50;
+    const testValues: [f32; 6] = [0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
+
     unsafe{
         init_tables();
-    }
     
-    //let mut results = String::new(); 
-    let mut run = 0;
+        //let mut results = String::new(); 
 
-    let mut times = vec!();
-    let mut scores = vec!();
-    let mut move_rates = vec!();
-    let mut score_rates = vec!();
-    let mut max_tiles = vec!();
+        for &threshold in testValues.iter() {
+            CPROB_THRESH_BASE = threshold;
 
-    loop {
-        run += 1;
-        let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
+            let mut run = 0;
 
-        times.push(time);
-        scores.push(score);
-        move_rates.push(mvsec);
-        score_rates.push(ptsec);
-        max_tiles.push(maxtile);
-	
-	print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
-        println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
-            run,
-            avg2(&times),
-            avg(&move_rates),
-            avg(&score_rates),
-            percent_above(&max_tiles, 11),
-            percent_above(&max_tiles, 12),
-            percent_above(&max_tiles, 13),
-            percent_above(&max_tiles, 14),
-            percent_above(&max_tiles, 15),
-            percent_above(&max_tiles, 16));
-            
-        cursorUp(7);
+            let mut times = vec!();
+            let mut scores = vec!();
+            let mut move_rates = vec!();
+            let mut score_rates = vec!();
+            let mut max_tiles = vec!();
 
-        // Log results to file.
-        // We open and close each run so that information is not lost in the event of interruption
-        {
-            let mut file = OpenOptions::new()
-                        .append(true)
-                        .open("results.txt").unwrap();
+            for run in 1..RUNS+1 {
+                let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
 
-            write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
-                CPROB_THRESH_BASE,
-                time,
-                score,
-                mvsec,
-                ptsec,
-                maxtile);
+                times.push(time);
+                scores.push(score);
+                move_rates.push(mvsec);
+                score_rates.push(ptsec);
+                max_tiles.push(maxtile);
+                
+                print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
+                println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
+                    run,
+                    avg2(&times),
+                    avg(&move_rates),
+                    avg(&score_rates),
+                    percent_above(&max_tiles, 11),
+                    percent_above(&max_tiles, 12),
+                    percent_above(&max_tiles, 13),
+                    percent_above(&max_tiles, 14),
+                    percent_above(&max_tiles, 15),
+                    percent_above(&max_tiles, 16));
+                    
+                cursorUp(7);
+
+                // Log results to file.
+                // We open and close each run so that information is not lost in the event of interruption
+                {
+                    let mut file = OpenOptions::new()
+                                .append(true)
+                                .open("results.txt").unwrap();
+
+                    write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
+                        CPROB_THRESH_BASE,
+                        time,
+                        score,
+                        mvsec,
+                        ptsec,
+                        maxtile);
+                }
+            }
+
+            println!("\n\n\n\n\n\n\n");
         }
-        if maxtile == 16 {
-           // break;
-        }        
     }
 }
 
