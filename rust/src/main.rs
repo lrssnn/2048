@@ -610,7 +610,7 @@ fn main() {
         score_rates.push(ptsec);
         max_tiles.push(maxtile);
 	
-	print!("PROB THRESH: {} ", CPROB_THRESH_BASE);
+	print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
         println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
             run,
             avg2(&times),
