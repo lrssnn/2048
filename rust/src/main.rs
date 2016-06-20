@@ -430,22 +430,7 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     let mut state = EvalState{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: TransTable::new()};
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
-    let start = SystemTime::now();
     let res = _score_toplevel_move(&mut state, board, mv);
-    let diff = match SystemTime::now().duration_since(start) {
-        Ok(duration) => duration,
-        Err(duration) => {println!("Time error"); duration.duration()}
-    };
-   /* 
-    println!("Move {}: result {}: eval'd {} moves ({} cache hits, {} cache size) in {} seconds (maxdepth={}",
-        mv,
-        res,
-        state.moves_evaled,
-        state.cachehits,
-        state.trans_table.len(),
-        diff.as_secs(),
-        state.maxdepth);
-    */
     res
 }
 
@@ -531,7 +516,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     println!("\n\n\n\n\n"); // This is gross
     loop {
 
-        cursorUp(6);
+        cursor_up(6);
     	print_board(board);
 
         let mv: u8;
@@ -592,17 +577,15 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 fn main() {
     
     const RUNS: u16 = 50;
-    const testValues: [f32; 6] = [0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
+    const TEST_VALUES: [f32; 6] = [0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
 
     unsafe{
         init_tables();
     
         //let mut results = String::new(); 
 
-        for &threshold in testValues.iter() {
+        for &threshold in TEST_VALUES.iter() {
             CPROB_THRESH_BASE = threshold;
-
-            let mut run = 0;
 
             let mut times = vec!();
             let mut scores = vec!();
@@ -632,7 +615,7 @@ fn main() {
                     percent_above(&max_tiles, 15),
                     percent_above(&max_tiles, 16));
                     
-                cursorUp(7);
+                cursor_up(7);
 
                 // Log results to file.
                 // We open and close each run so that information is not lost in the event of interruption
@@ -647,7 +630,7 @@ fn main() {
                         score,
                         mvsec,
                         ptsec,
-                        maxtile);
+                        maxtile).unwrap();
                 }
             }
 
@@ -688,10 +671,10 @@ fn percent_above(vec: &Vec<u16>, thresh: u16) -> f32 {
     (amnt as f32 / vec.len() as f32) * 100.0
 }
 
-fn cursorUp(num: u16) {
+fn cursor_up(num: u16) {
     let mut term = term::stdout().unwrap();
     
-    for i in 0..num {
-        term.cursor_up();   
+    for _i in 0..num {
+        term.cursor_up().unwrap();   
     }
 }
