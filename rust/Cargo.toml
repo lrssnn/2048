@@ -7,3 +7,4 @@ authors = ["Niklas Larsson <niklaslarsson95@gmail.com>"]
 [dependencies]
 rand = "0.3.0"
 term = "0.4.4"
+lazy_static = "0.2.1"

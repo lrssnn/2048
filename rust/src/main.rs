@@ -2,6 +2,8 @@
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
 extern crate term;
+#[macro_use]
+extern crate lazy_static;
 
 use rand::Rng;
 use std::time::SystemTime;
@@ -15,13 +17,13 @@ type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics f
 
 // Tables which are filled with precomputed moves. Any row XORed with row_left_table[row] will be the result 
 // of swiping that row left, and so on with the other directions.
-static mut row_left_table:   [u16; 65536] = [0; 65536];
-static mut row_right_table:  [u16; 65536] = [0; 65536];
-static mut col_up_table:     [u64; 65536] = [0; 65536];
-static mut col_down_table:   [u64; 65536] = [0; 65536];
+//static mut row_left_table:   [u16; 65536] = [0; 65536]
+//static mut row_right_table:  [u16; 65536] = [0; 65536];
+//static mut col_up_table:     [u64; 65536] = [0; 65536];
+//static mut col_down_table:   [u64; 65536] = [0; 65536];
 // Precomputed heuristics and scores for single rows also
-static mut heur_score_table: [f32; 65536] = [0.0; 65536];
-static mut score_table:      [f32; 65536] = [0.0; 65536];
+//static mut heur_score_table: [f32; 65536] = [0.0; 65536];
+//static mut score_table:      [f32; 65536] = [0.0; 65536];
 
 // Constants to tune game behaviour
 const SCORE_LOST_PENALTY:       f32 = 200000.0;
@@ -32,7 +34,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-static mut CPROB_THRESH_BASE: f32 = 0.05; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.01; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -55,6 +57,15 @@ struct EvalState {
     depth_limit: u32,        // The maximum depth to look in this evaluation
 }
 
+lazy_static! {
+    static ref TABLES: ([u16; 65536], [u16; 65536], [u64; 65536], [u64; 65536], [f32; 65536], [f32; 65536]) = init_tables();
+    static ref ROW_LEFT_TABLE: [u16; 65536]   = TABLES.0;
+    static ref ROW_RIGHT_TABLE: [u16; 65536]  = TABLES.1;
+    static ref COL_UP_TABLE: [u64; 65536]     = TABLES.2;
+    static ref COL_DOWN_TABLE: [u64; 65536]   = TABLES.3;
+    static ref HEUR_SCORE_TABLE: [f32; 65536] = TABLES.4;
+    static ref SCORE_TABLE: [f32; 65536]      = TABLES.5;
+}
 // Prints the bitboard in a human readable format
 fn print_board(mut board: u64) {
     for _i in 0..4 {
@@ -110,8 +121,16 @@ fn count_empty(mut board: u64) -> u64 {
 }
 
 // Initialises the precomputed tables used to execute moves and score states
-unsafe fn init_tables() {
+fn init_tables() -> ([u16; 65536], [u16; 65536], [u64; 65536], [u64; 65536], [f32; 65536], [f32; 65536]) {
+    let mut row_left_table:   [u16; 65536] = [0; 65536];
+    let mut row_right_table:  [u16; 65536] = [0; 65536];
+    let mut col_up_table:     [u64; 65536] = [0; 65536];
+    let mut col_down_table:   [u64; 65536] = [0; 65536];
+
+    let mut heur_score_table: [f32; 65536] = [0.0; 65536];
+    let mut score_table:      [f32; 65536] = [0.0; 65536];
     // Each possible row (16 bit number) has its results precomputed
+    
     for row in 0..65536usize {
         // Convert the 16 bit number into an array of 4 parts (effectively 4 bit numbers)
         let mut line = [
@@ -217,49 +236,51 @@ unsafe fn init_tables() {
         col_up_table    [    row]          = unpack_col(    row as u16) ^ unpack_col(    result);
         col_down_table  [rev_row as usize] = unpack_col(rev_row)        ^ unpack_col(rev_result);
     }            
+
+    return (row_left_table, row_right_table, col_up_table, col_down_table, heur_score_table, score_table);
 }
 
 // Swipe the given board up
-unsafe fn execute_move_0(board: u64) -> u64 {
+fn execute_move_0(board: u64) -> u64 {
     // Every row has a precomputed result, so we simply transpose to convert columns to rows, and combine the
     // results of each row in turn.
     let mut ret = board;
     let t   = transpose(board);
-    ret ^= col_up_table[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= col_up_table[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= col_up_table[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= col_up_table[((t >> 48) & ROW_MASK) as usize] << 12;
+    ret ^= COL_UP_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
+    ret ^= COL_UP_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
+    ret ^= COL_UP_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
+    ret ^= COL_UP_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
     ret
 }
 
 // Swipe the given board down
-unsafe fn execute_move_1(board: u64) -> u64 {
+fn execute_move_1(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
-    ret ^= col_down_table[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= col_down_table[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= col_down_table[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= col_down_table[((t >> 48) & ROW_MASK) as usize] << 12;
+    ret ^= COL_DOWN_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
+    ret ^= COL_DOWN_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
+    ret ^= COL_DOWN_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
+    ret ^= COL_DOWN_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
     ret
 }
 
 // Swipe the given board left
-unsafe fn execute_move_2(board: u64) -> u64 {
+fn execute_move_2(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_left_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (row_left_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (row_left_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (row_left_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
+    ret ^= (ROW_LEFT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (ROW_LEFT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (ROW_LEFT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (ROW_LEFT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
 // Swipe the given board right
-unsafe fn execute_move_3(board: u64) -> u64 {
+fn execute_move_3(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_right_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (row_right_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (row_right_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (row_right_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
+    ret ^= (ROW_RIGHT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
@@ -270,14 +291,12 @@ unsafe fn execute_move_3(board: u64) -> u64 {
 //     3 -> left
 // Any other value of mv will return a 0 board.
 fn execute_move(mv: u8, board: u64) -> u64 {
-    unsafe{
-        match mv {
-            0 => execute_move_0(board),
-            1 => execute_move_1(board),
-            2 => execute_move_2(board),
-            3 => execute_move_3(board),
-            _ => {println!("INVALID_MOVE"); 0}
-        }
+    match mv {
+        0 => execute_move_0(board),
+        1 => execute_move_1(board),
+        2 => execute_move_2(board),
+        3 => execute_move_3(board),
+        _ => {println!("INVALID_MOVE"); 0}
     }
 }
 
@@ -313,17 +332,13 @@ fn count_distinct_tiles(mut board: u64) -> u32 {
 // Returns the heuristic score of the board.
 fn score_heur_board(board: u64) -> f32 {
     // Consider the board and the transpose because things like monotonicity matter in the x and y directions
-    unsafe{
-        score_helper(          board , &heur_score_table) +
-        score_helper(transpose(board), &heur_score_table)
-    }
+    score_helper(          board , &*HEUR_SCORE_TABLE) +
+    score_helper(transpose(board), &*HEUR_SCORE_TABLE)
 }
 
 // Returns the actual score of the board.
 fn score_board(board: u64)  -> f32 {
-    unsafe{
-        score_helper(board, &score_table)
-    }
+    score_helper(board, &*SCORE_TABLE)
 }
 
 // Returns the value of a player node in the game tree.
@@ -337,9 +352,7 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
         state.moves_evaled+= 1;
 
         if board != newboard {
-            unsafe {
-                best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
-            }
+            best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
         }
     }
     state.curdepth -= 1;
@@ -349,7 +362,7 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
 
 // Returns the value of a computer node in the game tree.
 // Plays the part of the Expected Value node in the Expectimax search.
-unsafe fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
+fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
     // Base case: simply return the heuristic if the current state is less likely than the threshold
     // or deeper than the depth limit
     if cprob < CPROB_THRESH_BASE || state.curdepth >= state.depth_limit {
@@ -420,9 +433,7 @@ fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
         return 0.0;
     }
 
-    unsafe {
-        score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
-    }
+    score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
 }
 
 // Takes a board and a move and sets up the infrastructure to perform the expectimax search on it.
@@ -577,67 +588,57 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 fn main() {
     
     const RUNS: u16 = 50;
-    const TEST_VALUES: [f32; 6] = [0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
-
-    unsafe{
-        init_tables();
     
-        //let mut results = String::new(); 
+    let mut times = vec!();
+    let mut scores = vec!();
+    let mut move_rates = vec!();
+    let mut score_rates = vec!();
+    let mut max_tiles = vec!();
 
-        for &threshold in TEST_VALUES.iter() {
-            CPROB_THRESH_BASE = threshold;
+    for run in 1..RUNS+1 {
+        let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
 
-            let mut times = vec!();
-            let mut scores = vec!();
-            let mut move_rates = vec!();
-            let mut score_rates = vec!();
-            let mut max_tiles = vec!();
-
-            for run in 1..RUNS+1 {
-                let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
-
-                times.push(time);
-                scores.push(score);
-                move_rates.push(mvsec);
-                score_rates.push(ptsec);
-                max_tiles.push(maxtile);
+        times.push(time);
+        scores.push(score);
+        move_rates.push(mvsec);
+        score_rates.push(ptsec);
+        max_tiles.push(maxtile);
                 
-                print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
-                println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
-                    run,
-                    avg2(&times),
-                    avg(&move_rates),
-                    avg(&score_rates),
-                    percent_above(&max_tiles, 11),
-                    percent_above(&max_tiles, 12),
-                    percent_above(&max_tiles, 13),
-                    percent_above(&max_tiles, 14),
-                    percent_above(&max_tiles, 15),
-                    percent_above(&max_tiles, 16));
+        print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
+        println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
+            run,
+            avg2(&times),
+            avg(&move_rates),
+            avg(&score_rates),
+            percent_above(&max_tiles, 11),
+            percent_above(&max_tiles, 12),
+            percent_above(&max_tiles, 13),
+            percent_above(&max_tiles, 14),
+            percent_above(&max_tiles, 15),
+            percent_above(&max_tiles, 16));
                     
-                cursor_up(7);
+        cursor_up(7);
 
-                // Log results to file.
-                // We open and close each run so that information is not lost in the event of interruption
-                {
-                    let mut file = OpenOptions::new()
-                                .append(true)
-                                .open("results.txt").unwrap();
+        // Log results to file.
+        // We open and close each run so that information is not lost in the event of interruption
+        {
+            let mut file = OpenOptions::new()
+                        .append(true)
+                        .open("results.txt").unwrap();
 
-                    write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
-                        CPROB_THRESH_BASE,
-                        time,
-                        score,
-                        mvsec,
-                        ptsec,
-                        maxtile).unwrap();
-                }
-            }
-
-            println!("\n\n\n\n\n\n\n");
+            write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
+                CPROB_THRESH_BASE,
+                time,
+                score,
+                mvsec,
+                ptsec,
+                maxtile).unwrap();
         }
     }
+
+    println!("\n\n\n\n\n\n\n");
 }
+
 
 fn avg(vec: &Vec<f32>) -> f32 {
     let mut res: f32 = 0.0;
