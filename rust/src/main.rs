@@ -34,7 +34,6 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -343,7 +342,7 @@ fn score_board(board: u64)  -> f32 {
 
 // Returns the value of a player node in the game tree.
 // Plays the part of the Maximiser node in the Expectimax search.
-fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
+fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32, CPROB_THRESH_BASE: f32) -> f32 {
     let mut best: f32 = 0.0;
     state.curdepth+= 1;
     // Look at each possible move and track the highest value
@@ -352,7 +351,7 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
         state.moves_evaled+= 1;
 
         if board != newboard {
-            best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
+            best = best.max(score_tilechoose_node(&mut state, newboard, cprob, CPROB_THRESH_BASE));
         }
     }
     state.curdepth -= 1;
@@ -362,7 +361,7 @@ fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
 
 // Returns the value of a computer node in the game tree.
 // Plays the part of the Expected Value node in the Expectimax search.
-fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
+fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32, CPROB_THRESH_BASE: f32) -> f32 {
     // Base case: simply return the heuristic if the current state is less likely than the threshold
     // or deeper than the depth limit
     if cprob < CPROB_THRESH_BASE || state.curdepth >= state.depth_limit {
@@ -399,8 +398,8 @@ fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) ->
     // simulating another human (move_node) move. 
     while tile_2 != 0 {
         if (tmp & 0xF) == 0 {
-            res += score_move_node(&mut state, board |  tile_2      , cprob * 0.9) * 0.9;
-            res += score_move_node(&mut state, board | (tile_2 << 1), cprob * 0.1) * 0.1;
+            res += score_move_node(&mut state, board |  tile_2      , cprob * 0.9, CPROB_THRESH_BASE) * 0.9;
+            res += score_move_node(&mut state, board | (tile_2 << 1), cprob * 0.1, CPROB_THRESH_BASE) * 0.1;
         }
         tmp >>= 4;
         tile_2 <<= 4;
@@ -426,27 +425,27 @@ fn score_helper(board: u64, table: &[f32]) -> f32{
 }
 
 // Takes a move and a board and evaluates the value of that move. Begins the expectimax search on this state
-fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
+fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8, CPROB_THRESH_BASE: f32) -> f32 {
     let newboard = execute_move(mv, board);
 
     if board == newboard {
         return 0.0;
     }
 
-    score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
+    score_tilechoose_node(&mut state, newboard, 1.0, CPROB_THRESH_BASE) + 0.000001
 }
 
 // Takes a board and a move and sets up the infrastructure to perform the expectimax search on it.
-fn score_toplevel_move(board: u64, mv: u8) -> f32 {
+fn score_toplevel_move(board: u64, mv: u8, CPROB_THRESH_BASE: f32) -> f32 {
     let mut state = EvalState{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: TransTable::new()};
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
-    let res = _score_toplevel_move(&mut state, board, mv);
+    let res = _score_toplevel_move(&mut state, board, mv, CPROB_THRESH_BASE);
     res
 }
 
 // Takes a board and returns the most effective move to make on it
-fn find_best_move(board: u64) -> u8 {
+fn find_best_move(board: u64, CPROB_THRESH_BASE: f32) -> u8 {
     let mut best: f32 = 0.0;
     let mut bestmove: u8 = 0;
 
@@ -458,7 +457,7 @@ fn find_best_move(board: u64) -> u8 {
     let mut threads = vec!();
     for mv in 0..4 {
         let handle = thread::spawn(move || {
-            (score_toplevel_move(board, mv), mv)
+            (score_toplevel_move(board, mv, CPROB_THRESH_BASE), mv)
         });
         
         threads.push(handle);
@@ -516,7 +515,7 @@ fn initial_board() -> u64 {
 }
 
 // Uses expectimax search to play one game of 2048 to completion
-fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16) {
+fn play_game(run_num: u16, get_move: fn(u64, f32) -> u8, CPROB_THRESH_BASE: f32) -> (u64, f32, f32, f32, u16) {
     let mut board: u64 = initial_board();
     let mut moveno = 0;
     let mut scorepenalty: u32 = 0;
@@ -547,7 +546,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
         //std::io::stdout().flush();
         moveno += 1;
 
-        mv = get_move(board);
+        mv = get_move(board, CPROB_THRESH_BASE);
         if mv > 3 {
             break;
         }
@@ -595,8 +594,10 @@ fn main() {
     let mut score_rates = vec!();
     let mut max_tiles = vec!();
 
+    let CPROB_THRESH_BASE: f32 = 0.001;
+
     for run in 1..RUNS+1 {
-        let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
+        let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move, CPROB_THRESH_BASE);    
 
         times.push(time);
         scores.push(score);
