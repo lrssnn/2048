@@ -34,7 +34,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-const CPROB_THRESH_BASE: f32 = 0.01; // Will not evaluate nodes less likely than this
+const CPROB_THRESH_BASE: f32 = 0.0001; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -587,7 +587,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 // Bootstrap: initialise tables and play a game
 fn main() {
     
-    const RUNS: u16 = 50;
+    const RUNS: u16 = 1;
     
     let mut times = vec!();
     let mut scores = vec!();

@@ -436,3 +436,6 @@ Prob Thresh: 0.0001 | Time:   404 | Score: 177352.0 | Mv/Sec: 18.42 | Pt/Sec: 43
 Prob Thresh: 0.0001 | Time:   789 | Score: 346780.0 | Mv/Sec: 16.76 | Pt/Sec: 439.52 | Max Tile: 14
 Prob Thresh: 0.0001 | Time:  1014 | Score: 387540.0 | Mv/Sec: 14.76 | Pt/Sec: 382.19 | Max Tile: 14
 Prob Thresh: 0.0001 | Time:   589 | Score: 288804.0 | Mv/Sec: 18.78 | Pt/Sec: 490.33 | Max Tile: 14
+Prob Thresh: 0.001 | Time:   306 | Score: 387016.0 | Mv/Sec: 48.47 | Pt/Sec: 1264.76 | Max Tile: 14
+Prob Thresh: 0.001 | Time:   288 | Score: 387140.0 | Mv/Sec: 51.60 | Pt/Sec: 1344.24 | Max Tile: 14
+Prob Thresh: 0.0001 | Time:  2150 | Score: 387376.0 | Mv/Sec: 6.95 | Pt/Sec: 180.17 | Max Tile: 14
