@@ -56,6 +56,12 @@ struct EvalState {
     depth_limit: u32,        // The maximum depth to look in this evaluation
 }
 
+// Code in this block is evaluated as a lazy static, so the tables are populated the first time they are
+// used and then it becomes a global static. 
+// The lazy nature of this is not necessary, I am using this crate to allow a global static which is
+// mutable at init time then is immutable throughout, to prevent the safety rules from freaking out
+// over a global mutable static.
+// Something about this lazy static crate does not work on windows.
 lazy_static! {
     static ref TABLES: ([u16; 65536], [u16; 65536], [u64; 65536], [u64; 65536], [f32; 65536], [f32; 65536]) = init_tables();
     static ref ROW_LEFT_TABLE: [u16; 65536]   = TABLES.0;
