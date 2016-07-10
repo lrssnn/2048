@@ -516,19 +516,21 @@ fn initial_board() -> u64 {
 
 // Uses expectimax search to play one game of 2048 to completion
 fn play_game(run_num: u16, get_move: fn(u64, f32) -> u8, CPROB_THRESH_BASE: f32) -> (u64, f32, f32, f32, u16) {
-    let mut board: u64 = initial_board();
-    let mut moveno = 0;
+    // Initial Setup
+    let mut board: u64        = initial_board();
+    let mut moveno            = 0;
     let mut scorepenalty: u32 = 0;
-    let mut got_max_tile = false;
+    let mut got_max_tile      = false;
 
     let start = SystemTime::now();
     
     println!("\n\n\n\n\n"); // This is gross
     loop {
-
+		// Print the board over the old board
         cursor_up(6);
     	print_board(board);
 
+		// Check if the board is locked (no productive moves)
         let mv: u8;
         let newboard: u64;
         let mut i = 0;
@@ -542,16 +544,21 @@ fn play_game(run_num: u16, get_move: fn(u64, f32) -> u8, CPROB_THRESH_BASE: f32)
             break;
         }
 
+		// Print some data about the run to this point
         println!("Run {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
-        //std::io::stdout().flush();
         moveno += 1;
 
+		// Calculate the best move using the given function
         mv = get_move(board, CPROB_THRESH_BASE);
         if mv > 3 {
+			// Something has gone wrong with the calculation, end the game
             break;
         }
-
+		
+		// Actually execute the move
         newboard = execute_move(mv, board);
+		
+		// Sanity checks
         if newboard == board {
             println!("Illegal Move");
             moveno -= 1;
@@ -561,7 +568,8 @@ fn play_game(run_num: u16, get_move: fn(u64, f32) -> u8, CPROB_THRESH_BASE: f32)
             got_max_tile = true;
             break;
         }
-
+		
+		// Add a new tile to the board
         let tile: u64 = draw_tile();
         if tile == 2 {scorepenalty += 4};
         board = insert_tile_rand(newboard, tile);
@@ -575,10 +583,6 @@ fn play_game(run_num: u16, get_move: fn(u64, f32) -> u8, CPROB_THRESH_BASE: f32)
     let final_score = score_board(board) - scorepenalty as f32;
     let time = diff.as_secs();
 
-    //println!("");
-    //print_board(board);
-    //println!("Game Over. Score: {}. Highest Tile: {}.", final_score, get_max_rank(board));
-
     // Return Time, Score, Moves/s, Pts/s, Highest Tile
     (time, final_score, moveno as f32/time as f32, final_score/time as f32, if !got_max_tile { get_max_rank(board) } else { 16 }) 
 }
@@ -588,11 +592,11 @@ fn main() {
     
     const RUNS: u16 = 1;
     
-    let mut times = vec!();
-    let mut scores = vec!();
-    let mut move_rates = vec!();
+    let mut times       = vec!();
+    let mut scores      = vec!();
+    let mut move_rates  = vec!();
     let mut score_rates = vec!();
-    let mut max_tiles = vec!();
+    let mut max_tiles   = vec!();
 
     let CPROB_THRESH_BASE: f32 = 0.001;
 
