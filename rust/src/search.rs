@@ -1,17 +1,10 @@
 use std::cmp::max;
 use std::collections::HashMap;
 use std::thread;
-use super::ROW_LEFT_TABLE;
-use super::ROW_RIGHT_TABLE;
-use super::COL_UP_TABLE;
-use super::COL_DOWN_TABLE;
 
-use super::ROW_MASK;
-use super::COL_MASK;
-
-use super::board::{get_max_rank, insert_tile_rand, draw_tile, execute_move, print_board};
-use super::board::{initial_board, unpack_col, reverse_row, count_empty, count_distinct_tiles};
-use super::scoring::{score_board, score_heur_board};
+use super::board::{execute_move};
+use super::board::{count_empty, count_distinct_tiles};
+use super::scoring::{score_heur_board};
 
 use super::CPROB_THRESH_BASE; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this

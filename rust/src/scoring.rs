@@ -3,7 +3,7 @@
 use super::HEUR_SCORE_TABLE;
 use super::SCORE_TABLE;
 use super::ROW_MASK;
-use super::transpose;
+use super::board::transpose;
 
 // Returns the actual score of the board.
 pub fn score_board(board: u64)  -> f32 {

@@ -10,8 +10,6 @@ use super::COL_DOWN_TABLE;
 use super::COL_MASK;
 use super::ROW_MASK;
 
-use super::transpose;
-
 // Swipe the given board up
 unsafe fn execute_move_0(board: u64) -> u64 {
     // Every row has a precomputed result, so we simply transpose to convert columns to rows, and combine the
@@ -180,3 +178,18 @@ pub fn print_board(mut board: u64) {
     println!("");
 }
 
+// Takes a bitboard and returns the transposition of that board
+// a b c d     a e i m
+// e f g h  => b f j n
+// i j k l     c g k o
+// m n o p     d h l p
+pub fn transpose(board: u64) -> u64 {
+    let a1: u64 = board & 0xF0F00F0FF0F00F0F;
+    let a2: u64 = board & 0x0000F0F00000F0F0;
+    let a3: u64 = board & 0x0F0F00000F0F0000;
+    let a : u64 = a1 | (a2 << 12) | (a3 >> 12);
+    let b1: u64 = a & 0xFF00FF0000FF00FF;
+    let b2: u64 = a & 0x00FF00FF00000000;
+    let b3: u64 = a & 0x00000000FF00FF00;
+    b1 | (b2 >> 24) | (b3 << 24)
+}
