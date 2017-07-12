@@ -1,18 +1,21 @@
-
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
 extern crate term;
 
-use rand::Rng;
+mod scoring;
+mod board;
+mod search;
+
+use scoring::{score_board, score_heur_board};
+use board::{get_max_rank, insert_tile_rand, draw_tile, execute_move, print_board};
+use board::{initial_board, unpack_col, reverse_row};
+use search::{find_best_move};
+
 use std::time::SystemTime;
-use std::cmp::max;
-use std::collections::HashMap;
-use std::thread;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 
-type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics from the main code
 
 // Tables which are filled with precomputed moves. Any row XORed with ROW_LEFT_TABLE[row] will be the result 
 // of swiping that row left, and so on with the other directions.
@@ -20,9 +23,11 @@ static mut ROW_LEFT_TABLE:   [u16; 65536] = [0; 65536];
 static mut ROW_RIGHT_TABLE:  [u16; 65536] = [0; 65536];
 static mut COL_UP_TABLE:     [u64; 65536] = [0; 65536];
 static mut COL_DOWN_TABLE:   [u64; 65536] = [0; 65536];
+
 // Precomputed heuristics and scores for single rows also
 static mut HEUR_SCORE_TABLE: [f32; 65536] = [0.0; 65536];
 static mut SCORE_TABLE:      [f32; 65536] = [0.0; 65536];
+
 
 // Constants to tune game behaviour
 const SCORE_LOST_PENALTY:       f32 = 200000.0;
@@ -33,52 +38,11 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-static mut CPROB_THRESH_BASE: f32 = 0.5; // Will not evaluate nodes less likely than this
-const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
-
 // Masks to extract certain information from a u64 number
 const ROW_MASK: u64 = 0xFFFF; 
 const COL_MASK: u64 = 0x000F000F000F000F;
 
-// An entry in the game cache. Stores a heuristic value and the depth at which it was computed
-struct TransTableEntry {
-    depth: u8,
-    heuristic: f32
-}
-
-// The state of the current evaluation
-struct EvalState {
-    trans_table: TransTable, // The cache for this evaluation
-    maxdepth: u32,           // The maximum depth seen in this evaluation
-    curdepth: u32,           // The current depth of evaluation
-    cachehits: u32,          // Number of times a cached result has been reused
-    moves_evaled: u64,       // Number of game states evaluated in this evaluation
-    depth_limit: u32,        // The maximum depth to look in this evaluation
-}
-
-// Prints the bitboard in a human readable format
-fn print_board(mut board: u64) {
-    for _i in 0..4 {
-        for _j in 0..4 {
-            let power = board & 0xf; //Take the last byte in the number
-            print!("{:5},", if power == 0 {0} else {2 << (power-1)}); //2<<power = 2^power
-            board >>= 4; //Next byte
-        }
-        println!("");
-    }
-    println!("");
-}
-
-// Takes a column as a 16 bit number, and returns an empty bitboard with that column as the first column
-fn unpack_col(row: u16) -> u64 {
-    let tmp: u64 = row as u64;
-    (tmp | (tmp << 12) | (tmp << 24) | (tmp << 36)) & COL_MASK
-}
-
-// Takes a row as a 16 bit number and returns the reverse of it
-fn reverse_row(row: u16) -> u16 {
-    (row >> 12) | ((row >> 4) & 0x00F0) | ((row << 4) & 0x0F00) | (row << 12)
-}
+static mut CPROB_THRESH_BASE: f32 = 0.5; // Will not evaluate nodes less likely than this
 
 // Takes a bitboard and returns the transposition of that board
 // a b c d     a e i m
@@ -94,20 +58,6 @@ fn transpose(board: u64) -> u64 {
     let b2: u64 = a & 0x00FF00FF00000000;
     let b3: u64 = a & 0x00000000FF00FF00;
     b1 | (b2 >> 24) | (b3 << 24)
-}
-
-// Returns the number of open spaces in the given bitboard
-fn count_empty(mut board: u64) -> u64 {
-    board |= (board >> 2) & 0x3333333333333333;
-    board |=  board >> 1;
-    board  = !board & 0x1111111111111111;
-
-    board += board >> 32;
-    board += board >> 16;
-    board += board >>  8;
-    board += board >>  4;
-    
-    board & 0xF as u64
 }
 
 // Initialises the precomputed tables used to execute moves and score states
@@ -218,284 +168,6 @@ unsafe fn init_tables() {
         COL_UP_TABLE    [    row]          = unpack_col(    row as u16) ^ unpack_col(    result);
         COL_DOWN_TABLE  [rev_row as usize] = unpack_col(rev_row)        ^ unpack_col(rev_result);
     }            
-}
-
-// Swipe the given board up
-unsafe fn execute_move_0(board: u64) -> u64 {
-    // Every row has a precomputed result, so we simply transpose to convert columns to rows, and combine the
-    // results of each row in turn.
-    let mut ret = board;
-    let t   = transpose(board);
-    ret ^= COL_UP_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= COL_UP_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= COL_UP_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= COL_UP_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
-    ret
-}
-
-// Swipe the given board down
-unsafe fn execute_move_1(board: u64) -> u64 {
-    let mut ret = board;
-    let t   = transpose(board);
-    ret ^= COL_DOWN_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= COL_DOWN_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= COL_DOWN_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= COL_DOWN_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
-    ret
-}
-
-// Swipe the given board left
-unsafe fn execute_move_2(board: u64) -> u64 {
-    let mut ret = board;
-    ret ^= (ROW_LEFT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (ROW_LEFT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (ROW_LEFT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (ROW_LEFT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
-    ret
-}
-
-// Swipe the given board right
-unsafe fn execute_move_3(board: u64) -> u64 {
-    let mut ret = board;
-    ret ^= (ROW_RIGHT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (ROW_RIGHT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (ROW_RIGHT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (ROW_RIGHT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
-    ret
-}
-
-// Return the result of the specified move on the given board.
-// mv: 0 -> up
-//     1 -> down
-//     2 -> right
-//     3 -> left
-// Any other value of mv will return a 0 board.
-fn execute_move(mv: u8, board: u64) -> u64 {
-    unsafe{
-        match mv {
-            0 => execute_move_0(board),
-            1 => execute_move_1(board),
-            2 => execute_move_2(board),
-            3 => execute_move_3(board),
-            _ => {println!("INVALID_MOVE"); 0}
-        }
-    }
-}
-
-// Returns the maximum tile rank (power of 2) present on the given bitboard
-fn get_max_rank(mut board: u64) -> u16 {
-    let mut maxrank: u16 = 0;
-    // Simply consume the board nibble by nibble and track the highest tile seen.
-    while board != 0 {
-        maxrank = max(maxrank, (board & 0xF) as u16);
-        board >>= 4;
-    }
-    maxrank
-}
-
-// Returns the number of unique tiles on the board
-fn count_distinct_tiles(mut board: u64) -> u32 {
-    let mut bitset: u16 = 0;
-    while board != 0 {
-        bitset |= 1 << (board & 0xF);
-        board >>= 4;
-    }
-
-    bitset >>= 1;
-
-    let mut count = 0;
-    while bitset != 0 {
-        bitset &= bitset - 1;
-        count+= 1;
-    }
-    max(2, count)
-}
-
-// Returns the heuristic score of the board.
-fn score_heur_board(board: u64) -> f32 {
-    // Consider the board and the transpose because things like monotonicity matter in the x and y directions
-    unsafe{
-        score_helper(          board , &HEUR_SCORE_TABLE) +
-        score_helper(transpose(board), &HEUR_SCORE_TABLE)
-    }
-}
-
-// Returns the actual score of the board.
-fn score_board(board: u64)  -> f32 {
-    unsafe{
-        score_helper(board, &SCORE_TABLE)
-    }
-}
-
-// Returns the value of a player node in the game tree.
-// Plays the part of the Maximiser node in the Expectimax search.
-fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
-    let mut best: f32 = 0.0;
-    state.curdepth+= 1;
-    // Look at each possible move and track the highest value
-    for mv in 0..4 {
-        let newboard: u64 = execute_move(mv, board);
-        state.moves_evaled+= 1;
-
-        if board != newboard {
-            unsafe {
-                best = best.max(score_tilechoose_node(&mut state, newboard, cprob));
-            }
-        }
-    }
-    state.curdepth -= 1;
-
-    best
-}
-
-// Returns the value of a computer node in the game tree.
-// Plays the part of the Expected Value node in the Expectimax search.
-unsafe fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:f32) -> f32 {
-    // Base case: simply return the heuristic if the current state is less likely than the threshold
-    // or deeper than the depth limit
-    if cprob < CPROB_THRESH_BASE || state.curdepth >= state.depth_limit {
-        state.maxdepth = max(state.curdepth, state.maxdepth);
-        return score_heur_board(board);
-    }
-    // If the current depth is less than the cache depth limit, look in the cache in case we already know 
-    // the value of this board.
-    if state.curdepth < CACHE_DEPTH_LIMIT {
-        
-        let entry = state.trans_table.get(&board);  
-        // If we have cached this entry, return the cached value
-        if let Some(entry) = entry {
-            if entry.depth <= state.curdepth as u8 {
-                state.cachehits+= 1;
-                return entry.heuristic;
-            }
-        }
-    }
-
-    // We have not cached this board, calculate the value
-    // Scale the probability of the children of this node by the number of possible choices.
-    let num_open = count_empty(board);
-    cprob /= num_open as f32;
-
-    let mut res: f32 = 0.0;
-    let mut tmp = board;
-    let mut tile_2: u64 = 1;
-    
-    // For each empty tile on the board, add a two and a four to it and calculate the value of it by 
-    // simulating another human (move_node) move. 
-    while tile_2 != 0 {
-        if (tmp & 0xF) == 0 {
-            res += score_move_node(&mut state, board |  tile_2      , cprob * 0.9) * 0.9;
-            res += score_move_node(&mut state, board | (tile_2 << 1), cprob * 0.1) * 0.1;
-        }
-        tmp >>= 4;
-        tile_2 <<= 4;
-    }
-
-    res /= num_open as f32;
-
-    // If we aren't too deep, cache this result for next time.
-    if state.curdepth < CACHE_DEPTH_LIMIT {
-        let entry = TransTableEntry {depth: state.curdepth as u8, heuristic: res};
-        state.trans_table.insert(board, entry);
-    }
-
-    res
-}
-
-// Sums the scores held in the given table for each row in the given board.
-fn score_helper(board: u64, table: &[f32]) -> f32{
-    table[((board >>  0) & ROW_MASK) as usize] +
-    table[((board >> 16) & ROW_MASK) as usize] +
-    table[((board >> 32) & ROW_MASK) as usize] +
-    table[((board >> 48) & ROW_MASK) as usize] 
-}
-
-// Takes a move and a board and evaluates the value of that move. Begins the expectimax search on this state
-fn _score_toplevel_move(mut state: &mut EvalState, board: u64, mv: u8) -> f32 {
-    let newboard = execute_move(mv, board);
-
-    if board == newboard {
-        return 0.0;
-    }
-
-    unsafe {
-        score_tilechoose_node(&mut state, newboard, 1.0) + 0.000001
-    }
-}
-
-// Takes a board and a move and sets up the infrastructure to perform the expectimax search on it.
-fn score_toplevel_move(board: u64, mv: u8) -> f32 {
-    let mut state = EvalState{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: TransTable::new()};
-    state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
-
-    _score_toplevel_move(&mut state, board, mv)
-}
-
-// Takes a board and returns the most effective move to make on it
-fn find_best_move(board: u64) -> u8 {
-    let mut best: f32 = 0.0;
-    let mut bestmove: u8 = 0;
-
-    // For each possible move, evaluate the move with expectimax search and track the best result.
-    // Concurrent
-    let mut threads = vec!();
-    for mv in 0..4 {
-        let handle = thread::spawn(move || {
-            (score_toplevel_move(board, mv), mv)
-        });
-        
-        threads.push(handle);
-    }
-
-    for thread in threads {
-
-        let (res, mv) = thread.join().unwrap();
-
-        if res > best {
-            best = res;
-            bestmove = mv;
-        }
-    }
-    bestmove
-}
-
-// Returns a 2 or a 4 tile randomly. 10% chance of a 4.
-fn draw_tile() -> u64 {
-    if rand::thread_rng().gen_range(0,10) < 9 {
-        1
-    } else {
-        2
-    }
-}
-
-// Inserts the given tile in the given board, in a randomly selected open space.
-fn insert_tile_rand(board: u64, mut tile: u64) -> u64 {
-    let empty = count_empty(board) as u32;
-    if empty == 0 {return board;} // Cannot insert to a full board.
-    let mut index: u32 = rand::thread_rng().gen_range(0, empty);
-    let mut tmp: u64 = board;
-
-    // Find 'index' empty tiles before inserting the tile. That is, insert the tile in the 'index'th empty space
-    loop {
-        //Skip over non-empty tiles
-        while (tmp & 0xF) != 0 {
-            tmp >>= 4;
-            tile <<= 4;
-        }
-        //Empty tile found. If we've already found enough, this is where we will insert.
-        if index == 0 { break; }
-        // If not skip this tile also.
-        index -= 1;
-        tmp >>= 4;
-        tile <<= 4;
-    }
-    board | tile
-}
-
-// Returns a bitboard with two random tiles in it
-fn initial_board() -> u64 {
-    let board: u64 = draw_tile() << (4 * rand::thread_rng().gen_range(0, 16));
-    insert_tile_rand(board, draw_tile())
 }
 
 // Uses expectimax search to play one game of 2048 to completion
