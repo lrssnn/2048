@@ -27,6 +27,34 @@ struct EvalState {
     depth_limit: u32,        // The maximum depth to look in this evaluation
 }
 
+// Takes a board and returns the most effective move to make on it
+pub fn find_best_move(board: u64) -> u8 {
+    let mut best: f32 = 0.0;
+    let mut bestmove: u8 = 0;
+
+    // For each possible move, evaluate the move with expectimax search and track the best result.
+    // Concurrent
+    let mut threads = vec!();
+    for mv in 0..4 {
+        let handle = thread::spawn(move || {
+            (score_toplevel_move(board, mv), mv)
+        });
+        
+        threads.push(handle);
+    }
+
+    for thread in threads {
+
+        let (res, mv) = thread.join().unwrap();
+
+        if res > best {
+            best = res;
+            bestmove = mv;
+        }
+    }
+    bestmove
+}
+
 // Returns the value of a player node in the game tree.
 // Plays the part of the Maximiser node in the Expectimax search.
 fn score_move_node(mut state: &mut EvalState, board: u64, cprob: f32) -> f32 {
@@ -121,33 +149,5 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
     _score_toplevel_move(&mut state, board, mv)
-}
-
-// Takes a board and returns the most effective move to make on it
-pub fn find_best_move(board: u64) -> u8 {
-    let mut best: f32 = 0.0;
-    let mut bestmove: u8 = 0;
-
-    // For each possible move, evaluate the move with expectimax search and track the best result.
-    // Concurrent
-    let mut threads = vec!();
-    for mv in 0..4 {
-        let handle = thread::spawn(move || {
-            (score_toplevel_move(board, mv), mv)
-        });
-        
-        threads.push(handle);
-    }
-
-    for thread in threads {
-
-        let (res, mv) = thread.join().unwrap();
-
-        if res > best {
-            best = res;
-            bestmove = mv;
-        }
-    }
-    bestmove
 }
 

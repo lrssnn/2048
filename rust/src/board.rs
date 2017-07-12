@@ -10,6 +10,24 @@ use super::COL_DOWN_TABLE;
 use super::COL_MASK;
 use super::ROW_MASK;
 
+// Return the result of the specified move on the given board.
+// mv: 0 -> up
+//     1 -> down
+//     2 -> right
+//     3 -> left
+// Any other value of mv will return a 0 board.
+pub fn execute_move(mv: u8, board: u64) -> u64 {
+    unsafe{
+        match mv {
+            0 => execute_move_0(board),
+            1 => execute_move_1(board),
+            2 => execute_move_2(board),
+            3 => execute_move_3(board),
+            _ => {println!("INVALID_MOVE"); 0}
+        }
+    }
+}
+
 // Swipe the given board up
 unsafe fn execute_move_0(board: u64) -> u64 {
     // Every row has a precomputed result, so we simply transpose to convert columns to rows, and combine the
@@ -52,24 +70,6 @@ unsafe fn execute_move_3(board: u64) -> u64 {
     ret ^= (ROW_RIGHT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
     ret ^= (ROW_RIGHT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
-}
-
-// Return the result of the specified move on the given board.
-// mv: 0 -> up
-//     1 -> down
-//     2 -> right
-//     3 -> left
-// Any other value of mv will return a 0 board.
-pub fn execute_move(mv: u8, board: u64) -> u64 {
-    unsafe{
-        match mv {
-            0 => execute_move_0(board),
-            1 => execute_move_1(board),
-            2 => execute_move_2(board),
-            3 => execute_move_3(board),
-            _ => {println!("INVALID_MOVE"); 0}
-        }
-    }
 }
 
 // Returns the maximum tile rank (power of 2) present on the given bitboard
