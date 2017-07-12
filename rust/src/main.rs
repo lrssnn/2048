@@ -1,3 +1,4 @@
+
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
@@ -13,15 +14,15 @@ use std::io::prelude::*;
 
 type TransTable = HashMap<u64, TransTableEntry>; // Typedef to remove generics from the main code
 
-// Tables which are filled with precomputed moves. Any row XORed with row_left_table[row] will be the result 
+// Tables which are filled with precomputed moves. Any row XORed with ROW_LEFT_TABLE[row] will be the result 
 // of swiping that row left, and so on with the other directions.
-static mut row_left_table:   [u16; 65536] = [0; 65536];
-static mut row_right_table:  [u16; 65536] = [0; 65536];
-static mut col_up_table:     [u64; 65536] = [0; 65536];
-static mut col_down_table:   [u64; 65536] = [0; 65536];
+static mut ROW_LEFT_TABLE:   [u16; 65536] = [0; 65536];
+static mut ROW_RIGHT_TABLE:  [u16; 65536] = [0; 65536];
+static mut COL_UP_TABLE:     [u64; 65536] = [0; 65536];
+static mut COL_DOWN_TABLE:   [u64; 65536] = [0; 65536];
 // Precomputed heuristics and scores for single rows also
-static mut heur_score_table: [f32; 65536] = [0.0; 65536];
-static mut score_table:      [f32; 65536] = [0.0; 65536];
+static mut HEUR_SCORE_TABLE: [f32; 65536] = [0.0; 65536];
+static mut SCORE_TABLE:      [f32; 65536] = [0.0; 65536];
 
 // Constants to tune game behaviour
 const SCORE_LOST_PENALTY:       f32 = 200000.0;
@@ -32,7 +33,7 @@ const SCORE_SUM_WEIGHT:         f32 = 11.0;
 const SCORE_MERGES_WEIGHT:      f32 = 700.0;
 const SCORE_EMPTY_WEIGHT:       f32 = 270.0;
 
-static mut CPROB_THRESH_BASE: f32 = 0.05; // Will not evaluate nodes less likely than this
+static mut CPROB_THRESH_BASE: f32 = 0.5; // Will not evaluate nodes less likely than this
 const CACHE_DEPTH_LIMIT: u32 = 15;     // Will not cache nodes deeper than this
 
 // Masks to extract certain information from a u64 number
@@ -60,12 +61,12 @@ fn print_board(mut board: u64) {
     for _i in 0..4 {
         for _j in 0..4 {
             let power = board & 0xf; //Take the last byte in the number
-            print!("{:5},", if power == 0 {0} else {2 << power-1}); //2<<power = 2^power
+            print!("{:5},", if power == 0 {0} else {2 << (power-1)}); //2<<power = 2^power
             board >>= 4; //Next byte
         }
-        print!("\n");
+        println!("");
     }
-    print!("\n");
+    println!("");
 }
 
 // Takes a column as a 16 bit number, and returns an empty bitboard with that column as the first column
@@ -129,7 +130,7 @@ unsafe fn init_tables() {
                 score += (rank as f32 - 1.0) * (1 << rank) as f32;
             }
         }
-        score_table[row as usize] = score;
+        SCORE_TABLE[row as usize] = score;
 
         // Calculate merges
         let mut sum: f32 = 0.0;
@@ -169,7 +170,7 @@ unsafe fn init_tables() {
         }
         
         // Combine the components of the heuristic into one value
-        heur_score_table[row as usize] = SCORE_LOST_PENALTY + 
+        HEUR_SCORE_TABLE[row as usize] = SCORE_LOST_PENALTY + 
             SCORE_EMPTY_WEIGHT * empty as f32 +
             SCORE_MERGES_WEIGHT * merges as f32 -
             SCORE_MONOTONICITY_WEIGHT * monotonicity_left.min(monotonicity_right)-
@@ -212,10 +213,10 @@ unsafe fn init_tables() {
         let rev_row   : u16 = reverse_row(row as u16);
         
         // The result of each move is simply some modification of the left move, so we can store them all
-        row_left_table  [    row]          =                row as u16  ^                result;
-        row_right_table [rev_row as usize] =            rev_row         ^            rev_result;
-        col_up_table    [    row]          = unpack_col(    row as u16) ^ unpack_col(    result);
-        col_down_table  [rev_row as usize] = unpack_col(rev_row)        ^ unpack_col(rev_result);
+        ROW_LEFT_TABLE  [    row]          =                row as u16  ^                result;
+        ROW_RIGHT_TABLE [rev_row as usize] =            rev_row         ^            rev_result;
+        COL_UP_TABLE    [    row]          = unpack_col(    row as u16) ^ unpack_col(    result);
+        COL_DOWN_TABLE  [rev_row as usize] = unpack_col(rev_row)        ^ unpack_col(rev_result);
     }            
 }
 
@@ -225,10 +226,10 @@ unsafe fn execute_move_0(board: u64) -> u64 {
     // results of each row in turn.
     let mut ret = board;
     let t   = transpose(board);
-    ret ^= col_up_table[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= col_up_table[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= col_up_table[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= col_up_table[((t >> 48) & ROW_MASK) as usize] << 12;
+    ret ^= COL_UP_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
+    ret ^= COL_UP_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
+    ret ^= COL_UP_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
+    ret ^= COL_UP_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
     ret
 }
 
@@ -236,30 +237,30 @@ unsafe fn execute_move_0(board: u64) -> u64 {
 unsafe fn execute_move_1(board: u64) -> u64 {
     let mut ret = board;
     let t   = transpose(board);
-    ret ^= col_down_table[((t >>  0) & ROW_MASK) as usize] << 0;
-    ret ^= col_down_table[((t >> 16) & ROW_MASK) as usize] << 4;
-    ret ^= col_down_table[((t >> 32) & ROW_MASK) as usize] << 8;
-    ret ^= col_down_table[((t >> 48) & ROW_MASK) as usize] << 12;
+    ret ^= COL_DOWN_TABLE[((t >>  0) & ROW_MASK) as usize] << 0;
+    ret ^= COL_DOWN_TABLE[((t >> 16) & ROW_MASK) as usize] << 4;
+    ret ^= COL_DOWN_TABLE[((t >> 32) & ROW_MASK) as usize] << 8;
+    ret ^= COL_DOWN_TABLE[((t >> 48) & ROW_MASK) as usize] << 12;
     ret
 }
 
 // Swipe the given board left
 unsafe fn execute_move_2(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_left_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (row_left_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (row_left_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (row_left_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
+    ret ^= (ROW_LEFT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (ROW_LEFT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (ROW_LEFT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (ROW_LEFT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
 // Swipe the given board right
 unsafe fn execute_move_3(board: u64) -> u64 {
     let mut ret = board;
-    ret ^= (row_right_table[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
-    ret ^= (row_right_table[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
-    ret ^= (row_right_table[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
-    ret ^= (row_right_table[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
+    ret ^= (ROW_RIGHT_TABLE[((board >>  0) & ROW_MASK) as usize] as u64) <<  0;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 16) & ROW_MASK) as usize] as u64) << 16;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 32) & ROW_MASK) as usize] as u64) << 32;
+    ret ^= (ROW_RIGHT_TABLE[((board >> 48) & ROW_MASK) as usize] as u64) << 48;
     ret
 }
 
@@ -314,15 +315,15 @@ fn count_distinct_tiles(mut board: u64) -> u32 {
 fn score_heur_board(board: u64) -> f32 {
     // Consider the board and the transpose because things like monotonicity matter in the x and y directions
     unsafe{
-        score_helper(          board , &heur_score_table) +
-        score_helper(transpose(board), &heur_score_table)
+        score_helper(          board , &HEUR_SCORE_TABLE) +
+        score_helper(transpose(board), &HEUR_SCORE_TABLE)
     }
 }
 
 // Returns the actual score of the board.
 fn score_board(board: u64)  -> f32 {
     unsafe{
-        score_helper(board, &score_table)
+        score_helper(board, &SCORE_TABLE)
     }
 }
 
@@ -361,19 +362,16 @@ unsafe fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:
     if state.curdepth < CACHE_DEPTH_LIMIT {
         
         let entry = state.trans_table.get(&board);  
-        match entry {
-            Some(entry) => {
-                // We have found a cached entry, return the cached value.
-                if entry.depth <= state.curdepth as u8 {
-                    state.cachehits+= 1;
-                    return entry.heuristic;
-                }
+        // If we have cached this entry, return the cached value
+        if let Some(entry) = entry {
+            if entry.depth <= state.curdepth as u8 {
+                state.cachehits+= 1;
+                return entry.heuristic;
             }
-            // We have not cached this board, do nothing and continue to calculate the value
-            None => {}
         }
     }
 
+    // We have not cached this board, calculate the value
     // Scale the probability of the children of this node by the number of possible choices.
     let num_open = count_empty(board);
     cprob /= num_open as f32;
@@ -393,7 +391,7 @@ unsafe fn score_tilechoose_node(mut state: &mut EvalState, board:u64, mut cprob:
         tile_2 <<= 4;
     }
 
-    res = res / num_open as f32;
+    res /= num_open as f32;
 
     // If we aren't too deep, cache this result for next time.
     if state.curdepth < CACHE_DEPTH_LIMIT {
@@ -430,17 +428,13 @@ fn score_toplevel_move(board: u64, mv: u8) -> f32 {
     let mut state = EvalState{maxdepth: 0, curdepth: 0, moves_evaled: 0, cachehits:0, depth_limit:0, trans_table: TransTable::new()};
     state.depth_limit = max(3, (count_distinct_tiles(board) - 2));
 
-    let res = _score_toplevel_move(&mut state, board, mv);
-    res
+    _score_toplevel_move(&mut state, board, mv)
 }
 
 // Takes a board and returns the most effective move to make on it
 fn find_best_move(board: u64) -> u8 {
     let mut best: f32 = 0.0;
     let mut bestmove: u8 = 0;
-
-    //print_board(board);
-    //println!("Current scores: heur {}, actual {}", score_heur_board(board), score_board(board));
 
     // For each possible move, evaluate the move with expectimax search and track the best result.
     // Concurrent
@@ -468,9 +462,9 @@ fn find_best_move(board: u64) -> u8 {
 // Returns a 2 or a 4 tile randomly. 10% chance of a 4.
 fn draw_tile() -> u64 {
     if rand::thread_rng().gen_range(0,10) < 9 {
-        return 1;
+        1
     } else {
-        return 2;
+        2
     }
 }
 
@@ -495,7 +489,7 @@ fn insert_tile_rand(board: u64, mut tile: u64) -> u64 {
         tmp >>= 4;
         tile <<= 4;
     }
-    return board | tile;
+    board | tile
 }
 
 // Returns a bitboard with two random tiles in it
@@ -516,7 +510,6 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     println!("\n\n\n\n\n"); // This is gross
     loop {
 
-        cursor_up(6);
     	print_board(board);
 
         let mv: u8;
@@ -576,15 +569,15 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 // Bootstrap: initialise tables and play a game
 fn main() {
     
-    const RUNS: u16 = 50;
-    const TEST_VALUES: [f32; 6] = [0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
+    const RUNS: u16 = 1;
+    const TEST_VALUES: [f32; 1] = [0.01];
 
     unsafe{
         init_tables();
     
         //let mut results = String::new(); 
 
-        for &threshold in TEST_VALUES.iter() {
+        for &threshold in &TEST_VALUES {
             CPROB_THRESH_BASE = threshold;
 
             let mut times = vec!();
@@ -639,7 +632,7 @@ fn main() {
     }
 }
 
-fn avg(vec: &Vec<f32>) -> f32 {
+fn avg(vec: &[f32]) -> f32 {
     let mut res: f32 = 0.0;
     
     for num in vec {
@@ -649,7 +642,7 @@ fn avg(vec: &Vec<f32>) -> f32 {
     res/vec.len() as f32
 }
 
-fn avg2(vec: &Vec<u64>) -> f32 {
+fn avg2(vec: &[u64]) -> f32 {
     let mut res: f32 = 0.0;
     
     for num in vec {
@@ -659,7 +652,7 @@ fn avg2(vec: &Vec<u64>) -> f32 {
     res/vec.len() as f32
 }
 
-fn percent_above(vec: &Vec<u16>, thresh: u16) -> f32 {
+fn percent_above(vec: &[u16], thresh: u16) -> f32 {
     let mut amnt = 0;
 
     for num in vec {
