@@ -1,7 +1,6 @@
 // An implementation of a 4x4 2048 board.
 // Heavily inspired by the cpp implementation on github by user 'nneonneo'
 extern crate rand;
-extern crate term;
 
 mod scoring;
 mod board;
@@ -16,7 +15,6 @@ use board::{initial_board};
 use search::{find_best_move};
 
 use std::time::SystemTime;
-use std::fs::OpenOptions;
 use std::io::prelude::*;
 
 
@@ -41,14 +39,14 @@ static mut CPROB_THRESH_BASE: f32 = 0.5; // Will not evaluate nodes less likely 
 // Bootstrap: initialise tables and play a game
 fn main() {
 
-    const RUNS: u16 = 1;
-    const TEST_VALUES: [f32; 1] = [0.01];
+    const RUNS: u16 = 3;
+    const TEST_VALUES: [f32; 2] = [0.01, 0.005];
+
+    let mut summary = String::new();
 
     unsafe{
         init_tables();
     
-        //let mut results = String::new(); 
-
         for &threshold in &TEST_VALUES {
             CPROB_THRESH_BASE = threshold;
 
@@ -66,10 +64,10 @@ fn main() {
                 move_rates.push(mvsec);
                 score_rates.push(ptsec);
                 max_tiles.push(maxtile);
-                
-                print!("\nPROB THRESH: {} ", CPROB_THRESH_BASE);
-                println!("Run {:2} | Time: {:5.1} | Moves/Sec: {:3.2} | Points/Sec: {:3.2} | 2048%: {:3.1} | 4096%: {:3.1} | 8192%: {:3.1} | 16,384%: {:3.1} | 32,768%: {:3.1} | 65,536%: {:3.1}",
-                    run,
+            }
+
+            summary += &format!("{:4.4} | Time: {:5.1} | Moves/s: {:7.2} | Points/s: {:9.2} | 2k%: {:5.1} | 4k%: {:5.1} | 8k%: {:5.1} | 16k%: {:5.1} | 32k%: {:5.1} | 64k%: {:5.1}\n",
+                    CPROB_THRESH_BASE,
                     avg2(&times),
                     avg(&move_rates),
                     avg(&score_rates),
@@ -79,28 +77,9 @@ fn main() {
                     percent_above(&max_tiles, 14),
                     percent_above(&max_tiles, 15),
                     percent_above(&max_tiles, 16));
-                    
-                cursor_up(7);
 
-                // Log results to file.
-                // We open and close each run so that information is not lost in the event of interruption
-                {
-                    let mut file = OpenOptions::new()
-                                .append(true)
-                                .open("results.txt").unwrap();
-
-                    write!(file, "Prob Thresh: {} | Time: {:5.1} | Score: {:6.1} | Mv/Sec: {:3.2} | Pt/Sec: {:3.2} | Max Tile: {}\n",
-                        CPROB_THRESH_BASE,
-                        time,
-                        score,
-                        mvsec,
-                        ptsec,
-                        maxtile).unwrap();
-                }
-            }
-
-            println!("\n\n\n\n\n\n\n");
         }
+        println!("\n\n{}", summary);
     }
 }
 
@@ -114,7 +93,6 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
 
     let start = SystemTime::now();
     
-    println!("\n\n\n\n\n"); // This is gross
     loop {
 
     	print_board(board);
@@ -203,12 +181,4 @@ fn percent_above(vec: &[u16], thresh: u16) -> f32 {
     }
 
     (amnt as f32 / vec.len() as f32) * 100.0
-}
-
-fn cursor_up(num: u16) {
-    let mut term = term::stdout().unwrap();
-    
-    for _i in 0..num {
-        term.cursor_up().unwrap();   
-    }
 }
