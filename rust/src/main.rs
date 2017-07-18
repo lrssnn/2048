@@ -39,8 +39,8 @@ static mut CPROB_THRESH_BASE: f32 = 0.5; // Will not evaluate nodes less likely 
 // Bootstrap: initialise tables and play a game
 fn main() {
 
-    const RUNS: u16 = 3;
-    const TEST_VALUES: [f32; 2] = [0.01, 0.005];
+    const RUNS: u16 = 5;
+    const TEST_VALUES: [f32; 4] = [0.01, 0.005, 0.001, 0.0005];
 
     let mut summary = String::new();
 
@@ -77,7 +77,6 @@ fn main() {
                     percent_above(&max_tiles, 14),
                     percent_above(&max_tiles, 15),
                     percent_above(&max_tiles, 16));
-
         }
         println!("\n\n{}", summary);
     }
