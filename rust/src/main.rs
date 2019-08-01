@@ -50,6 +50,9 @@ fn main() {
         for &threshold in &TEST_VALUES {
             CPROB_THRESH_BASE = threshold;
 
+            print!("Testing {}", threshold);
+            std::io::stdout().flush();
+
             let mut times = vec!();
             let mut scores = vec!();
             let mut move_rates = vec!();
@@ -57,7 +60,11 @@ fn main() {
             let mut max_tiles = vec!();
 
             for run in 1..RUNS+1 {
-                let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move);    
+                
+                let (time, score, mvsec, ptsec, maxtile) = play_game(run, find_best_move); 
+
+                print!("|");
+                std::io::stdout().flush();   
 
                 times.push(time);
                 scores.push(score);
@@ -65,6 +72,8 @@ fn main() {
                 score_rates.push(ptsec);
                 max_tiles.push(maxtile);
             }
+
+            println!();
 
             summary += &format!("{:4.4} | Time: {:5.1} | Moves/s: {:7.2} | Points/s: {:9.2} | 2k%: {:5.1} | 4k%: {:5.1} | 8k%: {:5.1} | 16k%: {:5.1} | 32k%: {:5.1} | 64k%: {:5.1}\n",
                     CPROB_THRESH_BASE,
@@ -94,7 +103,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
     
     loop {
 
-    	print_board(board);
+    	//print_board(board);
 
         let mv: u8;
         let newboard: u64;
@@ -109,7 +118,7 @@ fn play_game(run_num: u16, get_move: fn(u64) -> u8) -> (u64, f32, f32, f32, u16)
             break;
         }
 
-        println!("Run {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
+        //println!("Run {}, Mov #{}, current score={}, max_Tile={}",run_num, moveno, score_board(board) - scorepenalty as f32, 2<<(get_max_rank(board) -1));
         //std::io::stdout().flush();
         moveno += 1;
 
